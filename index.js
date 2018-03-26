@@ -106,6 +106,13 @@ function formatInteger(value, picture) {
     switch(picture[0]) {
         case 'A':
         case 'a':
+            var letters = [];
+            var aCode = picture[0].charCodeAt(0);
+            while (value > 0) {
+                letters.unshift(String.fromCharCode((value - 1) % 26 + aCode));
+                value = Math.floor((value - 1) / 26);
+            }
+            formattedInteger = letters.join('');
             break;
         case 'i':
         case 'I':

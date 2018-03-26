@@ -182,7 +182,7 @@ describe('#formatInteger', function () {
             assert.equal(result, expected);
         });
 
-    })
+    });
 
     describe('words - ordinal', function () {
         it('12', function () {
@@ -260,6 +260,45 @@ describe('#formatInteger', function () {
         it('1e12 + 1', function () {
             var result = formatInteger(1e12 + 1, 'w;o');
             var expected = 'one trillion and first';
+            assert.equal(result, expected);
+        });
+
+    });
+
+    describe('spreadsheet column names', function () {
+        it('1', function () {
+            var result = formatInteger(1, 'A');
+            var expected = 'A';
+            assert.equal(result, expected);
+        });
+
+        it('12', function () {
+            var result = formatInteger(12, 'a');
+            var expected = 'l';
+            assert.equal(result, expected);
+        });
+
+        it('26', function () {
+            var result = formatInteger(26, 'a');
+            var expected = 'z';
+            assert.equal(result, expected);
+        });
+
+        it('27', function () {
+            var result = formatInteger(27, 'a');
+            var expected = 'aa';
+            assert.equal(result, expected);
+        });
+
+        it('300', function () {
+            var result = formatInteger(300, 'A');
+            var expected = 'KN';
+            assert.equal(result, expected);
+        });
+
+        it('123456', function () {
+            var result = formatInteger(123456, 'A');
+            var expected = 'FZPH';
             assert.equal(result, expected);
         });
 
