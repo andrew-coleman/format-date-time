@@ -2,6 +2,7 @@
 
 var formatInteger = require('../index').formatInteger;
 var formatDateTime = require('../index').formatDateTime;
+var parseDateTime = require('../index').parseDateTime;
 var assert = require('assert');
 var chai = require("chai");
 var expect = chai.expect;
@@ -409,6 +410,12 @@ describe('#formatDateTime', function () {
             assert.equal(result, expected);
         });
 
+        it('day/date/month in words', function () {
+            var result = formatDateTime(1521801216617, '[FNn], the [Dwo] of [MNn] [Y]');
+            var expected = 'Thursday, the twenty-third of March 2018';
+            assert.equal(result, expected);
+        });
+
         it('abbreviated day/month in words', function () {
             var result = formatDateTime(1521801216617, '[FNn,3-3], [D1o] [MNn,3-3] [Y]');
             var expected = 'Thu, 23rd Mar 2018';
@@ -416,5 +423,148 @@ describe('#formatDateTime', function () {
         });
 
     });
+
+});
+
+describe('#parseDateTime', function () {
+    describe('undefined value', function () {
+        it('should return result object', function () {
+            var result = parseDateTime(undefined);
+            var expected = undefined;
+            assert.equal(result, expected);
+        });
+    });
+
+    describe('basic date patterns', function () {
+        it('should parse string literal', function () {
+            var result = parseDateTime('Hello', 'Hello');
+            var expected = undefined;
+            assert.equal(result, expected);
+        });
+
+        it('should parse year', function () {
+            var result = parseDateTime('2018', '[Y1]');
+            var expected = new Date('2018-01-01T00:00:00.000Z');
+            assert.equal(result, expected.getTime());
+        });
+
+        it('should parse year/month/day', function () {
+            var result = parseDateTime('2018-03-27', '[Y1]-[M01]-[D01]');
+            var expected = new Date('2018-03-27T00:00:00.000Z');
+            assert.equal(result, expected.getTime());
+        });
+
+        it('should parse ISO 8601 format', function () {
+            var result = parseDateTime('2018-03-27T14:03:00.123Z', '[Y0001]-[M01]-[D01]T[H01]:[m01]:[s01].[f001]Z');
+            var expected = new Date('2018-03-27T14:03:00.123Z');
+            assert.equal(result, expected.getTime());
+        });
+
+    });
+
+    describe('ordinal numeric dates', function () {
+        it('should parse year/month/day', function () {
+            var result = parseDateTime('27th 3 1976', '[D1o] [M#1] [Y0001]');
+            var expected = new Date('1976-03-27T00:00:00.000Z');
+            assert.equal(result, expected.getTime());
+        });
+
+        it('should parse year/month/day', function () {
+            var result = parseDateTime('21st 12 1881', '[D1o] [M01] [Y0001]');
+            var expected = new Date('1881-12-21T00:00:00.000Z');
+            assert.equal(result, expected.getTime());
+        });
+
+        it('should parse year/month/day', function () {
+            var result = parseDateTime('2nd 12 2012', '[D1o] [M01] [Y0001]');
+            var expected = new Date('2012-12-02T00:00:00.000Z');
+            assert.equal(result, expected.getTime());
+        });
+
+    });
+
+
+    describe('roman numeral dates', function () {
+        it('should parse year', function () {
+            var result = parseDateTime('MCMLXXXIV', '[YI]');
+            var expected = new Date('1984-01-01T00:00:00.000Z');
+            assert.equal(result, expected.getTime());
+        });
+
+        it('should parse year/month/day', function () {
+            var result = parseDateTime('27 03 MMXVIII', '[D1] [M01] [YI]');
+            var expected = new Date('2018-03-27T00:00:00.000Z');
+            assert.equal(result, expected.getTime());
+        });
+
+        it('should parse year/month/day', function () {
+            var result = parseDateTime('27 iii MMXVIII', '[D1] [Mi] [YI]');
+            var expected = new Date('2018-03-27T00:00:00.000Z');
+            assert.equal(result, expected.getTime());
+        });
+
+
+    });
+
+    describe('months in words', function () {
+        it('should parse year/month/day', function () {
+            var result = parseDateTime('27th April 2008', '[D1o] [MNn] [Y0001]');
+            var expected = new Date('2008-04-27T00:00:00.000Z');
+            assert.equal(result, expected.getTime());
+        });
+
+        it('should parse year/month/day', function () {
+            var result = parseDateTime('21 August 2017', '[D1] [MNn] [Y0001]');
+            var expected = new Date('2017-08-21T00:00:00.000Z');
+            assert.equal(result, expected.getTime());
+        });
+
+        it('should parse year/month/day', function () {
+            var result = parseDateTime('2 Feb 2012', '[D1] [MNn,3-3] [Y0001]');
+            var expected = new Date('2012-02-02T00:00:00.000Z');
+            assert.equal(result, expected.getTime());
+        });
+
+    });
+
+    describe('should parse dates/years in words', function () {
+        it('should parse year in words', function () {
+            var result = parseDateTime('one thousand, nine hundred and eighty-four', '[Yw]');
+            var expected = new Date('1984-01-01T00:00:00.000Z');
+            assert.equal(result, expected.getTime());
+        });
+
+        it('should parse date/month in words', function () {
+            var result = parseDateTime('twenty-seven April 2008', '[Dw] [MNn] [Y0001]');
+            var expected = new Date('2008-04-27T00:00:00.000Z');
+            assert.equal(result, expected.getTime());
+        });
+
+        it('should parse date/month in ordinal words', function () {
+            var result = parseDateTime('twenty-seventh April 2008', '[Dw] [MNn] [Y0001]');
+            var expected = new Date('2008-04-27T00:00:00.000Z');
+            assert.equal(result, expected.getTime());
+        });
+
+        it('should parse ordinal date/month/year', function () {
+            var result = parseDateTime('twenty-first August two thousand and seventeen', '[Dw] [MNn] [Yw]');
+            var expected = new Date('2017-08-21T00:00:00.000Z');
+            assert.equal(result, expected.getTime());
+        });
+
+        it('should parse ordinal date/month/year', function () {
+            var result = parseDateTime('TWENTY-SECOND August two thousand and seventeen', '[DW] [MNn] [Yw]');
+            var expected = new Date('2017-08-22T00:00:00.000Z');
+            assert.equal(result, expected.getTime());
+        });
+
+        it('should parse ordinal date/month/year', function () {
+            var result = parseDateTime('Twentieth of August, two thousand and seventeen', '[DW] of [MNn], [Yw]');
+            var expected = new Date('2017-08-20T00:00:00.000Z');
+            assert.equal(result, expected.getTime());
+        });
+
+    });
+
 
 });
