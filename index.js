@@ -29,7 +29,10 @@ function numberToWords(value, ordinal) {
                 words += 'th';
             }
         } else {
-            const mag = Math.floor(Math.log10(num)/3);
+            var mag = Math.floor(Math.log10(num)/3);
+            if(mag > magnitudes.length) {
+                mag = magnitudes.length; // the largest word
+            }
             const factor = Math.pow(10, mag * 3);
             const mant = Math.floor(num / factor);
             const remainder = num - mant * factor;
@@ -122,7 +125,7 @@ function decimalToRoman(value, uppercase) {
     return '';
 }
 
-function numberToDecimal(roman) {
+function romanToDecimal(roman) {
     var decimal = 0;
     var max = 1;
     for(var i = roman.length - 1; i >= 0; i--) {
@@ -218,6 +221,11 @@ function formatInteger(value, picture) {
     return formattedInteger;
 }
 
+const defaultPresentationModifiers = {
+    Y: '1', M: '1', D: '1', d: '1', F: 'n', W: '1', w: '1', H: '1', h: '1',
+    P: 'n', m: '01', s: '01', f: '1', Z: '01:01', z: '01:01', C: 'n', E: 'n'
+};
+
 // the format specifier is an array of string literals and variable markers
 function analysePicture(picture) {
     var spec = [];
@@ -278,6 +286,9 @@ function analysePicture(picture) {
                 } else {
                     def.presentation1 = presMod;
                 }
+            } else {
+                // no presentation modifier specified - apply the default;
+                def.presentation1 = defaultPresentationModifiers[def.component];
             }
             if(def.component === 'Y') {
                 // §9.8.4.4
@@ -291,7 +302,7 @@ function analysePicture(picture) {
                     }
                 }
             }
-            if('YMDdFWwHhmsf'.indexOf(def.component) !== -1 && !def.presentation1 || (def.presentation1[0] !== 'N' && def.presentation1[0] !== 'n')) {
+            if('YMDdFWwHhmsf'.indexOf(def.component) !== -1 && def.presentation1[0] !== 'N' && def.presentation1[0] !== 'n') {
                 var integerPattern = def.presentation1;
                 if (typeof integerPattern === 'undefined') {
                     integerPattern = '0';
@@ -336,9 +347,19 @@ function analysePicture(picture) {
 const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
-function formatDateTime(millis, picture) {
+function formatDateTime(millis, picture, timezone) {
     if(typeof millis === 'undefined') {
         return undefined;
+    }
+
+    var offsetHours = 0;
+    var offsetMinutes = 0;
+    if(typeof timezone !== 'undefined') {
+        // parse the hour and minute offsets
+        // assume for now the format supplied is +hhmm
+        const offset = parseInt(timezone);
+        offsetHours = Math.floor(offset / 100);
+        offsetMinutes = offset % 100;
     }
 
     String.prototype.replaceAt = function(index, replacement) {
@@ -373,7 +394,11 @@ function formatDateTime(millis, picture) {
                 componentValue = date.getHours();
                 break;
             case 'h':
-                componentValue = date.getHours();  // TODO 12 hour format
+                componentValue = date.getHours();
+                componentValue = componentValue % 12;
+                if(componentValue === 0) {
+                    componentValue = 12;
+                }
                 break;
             case 'P':
                 componentValue = date.getHours() >= 12 ? 'pm' : 'am';
@@ -388,16 +413,14 @@ function formatDateTime(millis, picture) {
                 componentValue = date.getMilliseconds();
                 break;
             case 'Z':
-                componentValue = date.getDate();  // TODO
-                break;
             case 'z':
-                componentValue = date.getDate();// TODO
+                //componentValue = date.getTimezoneOffset();
                 break;
             case 'C':
-                componentValue = date.getDate();// TODO
+                componentValue = 'AD';
                 break;
             case 'E':
-                componentValue = date.getDate();// TODO
+                componentValue = 'Christian Era';
                 break;
         }
         // §9.8.4.3
@@ -411,7 +434,7 @@ function formatDateTime(millis, picture) {
                 if(markerSpec.component === 'M') {
                     componentValue = months[componentValue - 1];
                 } else if(markerSpec.component === 'F') {
-                    componentValue = days[componentValue - 1];
+                    componentValue = days[componentValue];
                 }
                 if(markerSpec.presentation1 === 'N') {
                     componentValue = componentValue.toUpperCase();
@@ -424,13 +447,17 @@ function formatDateTime(millis, picture) {
             } else {
                 componentValue = formatInteger(componentValue, markerSpec.integerPattern);
             }
+        } else if(markerSpec.component === 'Z') {
+            console.log(offsetHours, offsetMinutes);
+            componentValue = timezone ? timezone : 'Z';
         }
         return componentValue;
     };
 
     var formatSpec =  analysePicture(picture);
 
-    var dateTime = new Date(millis);
+    const offsetMillis = (60 * offsetHours + offsetMinutes) * 60 * 1000;
+    var dateTime = new Date(millis + offsetMillis);
 
     var result = '';
     formatSpec.forEach(function(part) {
@@ -460,11 +487,11 @@ function generateRegex(formatSpec) {
                         break;
                     case 'i':
                         part.regex = '[mdclxvi]+';
-                        part.parse = function(value) { return numberToDecimal(value.toUpperCase()); };
+                        part.parse = function(value) { return romanToDecimal(value.toUpperCase()); };
                         break;
                     case 'I':
                         part.regex = '[MDCLXVI]+';
-                        part.parse = function(value) { return numberToDecimal(value); };
+                        part.parse = function(value) { return romanToDecimal(value); };
                         break;
                     case 'w':
                     case 'W':
@@ -541,12 +568,6 @@ function parseDateTime(timestamp, picture) {
                 date.setDate();  // TODO
                 break;
             case 'z':
-                date.setDate();  // TODO
-                break;
-            case 'C':
-                date.setDate();  // TODO
-                break;
-            case 'E':
                 date.setDate();  // TODO
                 break;
             default:

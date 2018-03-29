@@ -4,8 +4,9 @@
   "description": "Implementation of XPath's format-integer and format-dateTime functions",
   "main": "index.js",
   "scripts": {
-    "test": "node ./node_modules/istanbul/lib/cli.js cover --report cobertura --report html ./node_modules/mocha/bin/_mocha -- --reporter mocha-jenkins-reporter \"test/**/*.js\"",
-    "posttest": "istanbul check-coverage -statement 100 -branch 100 -function 100 -line 100"
+    "test": "node ./node_modules/mocha/bin/mocha test/**/*.js --reporter spec ",
+    "ctest": "node ./node_modules/istanbul/lib/cli.js cover --report cobertura --report html ./node_modules/mocha/bin/_mocha -- --reporter mocha-jenkins-reporter \"test/**/*.js\"",
+    "cposttest": "istanbul check-coverage -statement 100 -branch 100 -function 100 -line 100"
   },
   "author": "Andrew Coleman",
   "license": "MIT",

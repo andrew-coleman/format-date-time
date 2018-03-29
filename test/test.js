@@ -183,6 +183,30 @@ describe('#formatInteger', function () {
             assert.equal(result, expected);
         });
 
+        it('1234567890123', function () {
+            var result = formatInteger(1234567890123, 'w');
+            var expected = 'one trillion, two hundred and thirty-four billion, five hundred and sixty-seven million, eight hundred and ninety thousand, one hundred and twenty-three';
+            assert.equal(result, expected);
+        });
+
+        it('1e15', function () {
+            var result = formatInteger(1e15, 'w');
+            var expected = 'one thousand trillion';
+            assert.equal(result, expected);
+        });
+
+        it('1e46', function () {
+            var result = formatInteger(1e46, 'w');
+            var expected = 'ten billion trillion trillion trillion';
+            assert.equal(result, expected);
+        });
+
+        it('1234567890123456', function () {
+            var result = formatInteger(1234567890123456, 'w');
+            var expected = 'one thousand, two hundred and thirty-four trillion, five hundred and sixty-seven billion, eight hundred and ninety million, one hundred and twenty-three thousand, four hundred and fifty-six';
+            assert.equal(result, expected);
+        });
+
     });
 
     describe('words - ordinal', function () {
@@ -322,36 +346,51 @@ describe('#formatDateTime', function () {
             assert.equal(result, expected);
         });
 
-        it('should return literal', function () {
+        it('should format the year', function () {
             var result = formatDateTime(1521801216617, 'Year: [Y0001]');
             var expected = 'Year: 2018';
             assert.equal(result, expected);
         });
 
-        it('should return literal', function () {
+        it('should format the year', function () {
             var result = formatDateTime(1521801216617, 'Year: <[Y0001]>');
             var expected = 'Year: <2018>';
             assert.equal(result, expected);
         });
 
-        it('should return literal', function () {
+        it('should format the date in European style', function () {
             var result = formatDateTime(1521801216617, '[D#1]/[M#1]/[Y0001]');
             var expected = '23/3/2018';
             assert.equal(result, expected);
         });
 
-        it('should return literal', function () {
+        it('should format the date in ISO 8601 style', function () {
             var result = formatDateTime(1521801216617, '[Y0001]-[M01]-[D01]');
             var expected = '2018-03-23';
             assert.equal(result, expected);
         });
 
-        it('should return literal', function () {
+        it('should format the date & time in US style', function () {
             var result = formatDateTime(1521801216617, '[M01]/[D01]/[Y0001] at [H01]:[m01]:[s01]');
             var expected = '03/23/2018 at 10:33:36';
             assert.equal(result, expected);
         });
 
+        it('should format the date & time in ISO 8601 style', function () {
+            var result = formatDateTime(1521801216617, '[Y]-[M01]-[D01]T[H01]:[m]:[s].[f001][Z01:01t]');
+            var expected = '2018-03-23T10:33:36.617Z';
+            assert.equal(result, expected);
+        });
+
+    });
+
+    describe('timezone', function () {
+        it('should offset for BST +0100', function () {
+            var result = formatDateTime(1521801216617, '[Y]-[M01]-[D01]T[H01]:[m]:[s].[f001][Z01:01t]', '+0100');
+            var expected = '2018-03-23T11:33:36.617+0100';
+            assert.equal(result, expected);
+
+        });
     });
 
     describe('width modifier', function () {
@@ -406,22 +445,42 @@ describe('#formatDateTime', function () {
 
         it('day/month in words', function () {
             var result = formatDateTime(1521801216617, '[FNn], [D1o] [MNn] [Y]');
-            var expected = 'Thursday, 23rd March 2018';
+            var expected = 'Friday, 23rd March 2018';
             assert.equal(result, expected);
         });
 
         it('day/date/month in words', function () {
             var result = formatDateTime(1521801216617, '[FNn], the [Dwo] of [MNn] [Y]');
-            var expected = 'Thursday, the twenty-third of March 2018';
+            var expected = 'Friday, the twenty-third of March 2018';
             assert.equal(result, expected);
         });
 
         it('abbreviated day/month in words', function () {
             var result = formatDateTime(1521801216617, '[FNn,3-3], [D1o] [MNn,3-3] [Y]');
-            var expected = 'Thu, 23rd Mar 2018';
+            var expected = 'Fri, 23rd Mar 2018';
             assert.equal(result, expected);
         });
 
+    });
+
+    describe('Default presentation modifiers', function () {
+        it('should apply default modifiers to day/date/time', function () {
+            var result = formatDateTime(1521801216617, '[F], [D]/[M]/[Y] [h]:[m]:[s] [P]');
+            var expected = 'friday, 23/3/2018 10:33:36 am';
+            assert.equal(result, expected);
+        });
+
+        it('should apply default modifiers to day/date/time 12hr pm', function () {
+            var result = formatDateTime(1204405500000, '[F], [D]/[M]/[Y] [h]:[m]:[s] [P]');
+            var expected = 'saturday, 1/3/2008 9:05:00 pm';
+            assert.equal(result, expected);
+        });
+
+        it('should apply default modifiers to day/date/time 12hr midnight', function () {
+            var result = formatDateTime(1199664000000, '[F], [D]/[M]/[Y] [h]:[m]:[s] [P]');
+            var expected = 'monday, 7/1/2008 12:00:00 am';
+            assert.equal(result, expected);
+        });
     });
 
 });
@@ -527,9 +586,15 @@ describe('#parseDateTime', function () {
 
     });
 
-    describe('should parse dates/years in words', function () {
+    describe('dates/years in words', function () {
         it('should parse year in words', function () {
             var result = parseDateTime('one thousand, nine hundred and eighty-four', '[Yw]');
+            var expected = new Date('1984-01-01T00:00:00.000Z');
+            assert.equal(result, expected.getTime());
+        });
+
+        it('should parse year in words', function () {
+            var result = parseDateTime('nineteen hundred and eighty-four', '[Yw]');
             var expected = new Date('1984-01-01T00:00:00.000Z');
             assert.equal(result, expected.getTime());
         });
