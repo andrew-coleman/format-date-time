@@ -249,7 +249,7 @@ function analysePicture(picture) {
             var comma = marker.lastIndexOf(',');
             var presMod;
             if(comma !== -1) {
-                // width modifier
+                // §9.8.4.2 The Width Modifier
                 var widthDef;
                 const widthMod = marker.substring(comma+1);
                 const dash = widthMod.indexOf('-');
@@ -344,8 +344,9 @@ function analysePicture(picture) {
     return spec;
 }
 
-const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const days = ['', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const millisInADay = 1000 * 60 * 60 * 24;
 
 function formatDateTime(millis, picture, timezone) {
     if(typeof millis === 'undefined') {
@@ -379,13 +380,48 @@ function formatDateTime(millis, picture, timezone) {
                 componentValue = date.getDate();
                 break;
             case 'd':
-                componentValue = date.getDate();  // TODO day of the year
+                // millis for given date (at 00:00 UTC)
+                const today = Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
+                // millis for given 1st Jan of that year (at 00:00 UTC)
+                const firstJan = Date.UTC(date.getFullYear(), 0);
+                componentValue = (today - firstJan) / millisInADay + 1;
                 break;
             case 'F':
                 componentValue = date.getDay();
+                if(componentValue === 0) {
+                    // ISO 8601 defines days 1-7: Mon-Sun
+                    componentValue = 7;
+                }
                 break;
             case 'W':
-                componentValue = date.getDate();  // TODO week of the year
+                const startOfFirstWeek = function(year) {
+                    // ISO 8601 defines the first week of the year to be the week that contains the first Thursday
+                    // the week starts on a Monday - calculate the millis for the start of the first week
+                    // millis for given 1st Jan of that year (at 00:00 UTC)
+                    const jan1 = Date.UTC(year, 0);
+                    var dayOfJan1 = (new Date(jan1)).getDay();
+                    if (dayOfJan1 === 0) {
+                        dayOfJan1 = 7;
+                    }
+                    // if Jan 1 is Fri, Sat or Sun, then add the number of days (in millis) to jan1 to get the start of week 1
+                    return dayOfJan1 > 4 ? jan1 + (8 - dayOfJan1) * millisInADay : jan1 - (dayOfJan1 - 1) * millisInADay;
+                };
+
+                const startOfWeek1 = startOfFirstWeek(date.getFullYear());
+                const today2 = Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
+                var week = (today2 - startOfWeek1) / (millisInADay * 7) + 1;
+                if(week > 52) {
+                    // might be first week of the following year
+                    const startOfFollowingYear = startOfFirstWeek(date.getFullYear() + 1);
+                    if(today2 >= startOfFollowingYear) {
+                        week = 1;
+                    }
+                } else if(week < 1) {
+                    // might be end of the previous year
+                    const startOfPreviousYear = startOfFirstWeek(date.getFullYear() - 1);
+                    week = (today2 - startOfPreviousYear) / (millisInADay * 7) + 1;
+                }
+                componentValue = Math.floor(week);
                 break;
             case 'w':
                 componentValue = date.getDate();  // TODO week of the month
@@ -414,7 +450,7 @@ function formatDateTime(millis, picture, timezone) {
                 break;
             case 'Z':
             case 'z':
-                //componentValue = date.getTimezoneOffset();
+                // since the date object is constructed from epoch millis, the TZ component is always be UTC.
                 break;
             case 'C':
                 componentValue = 'AD';
@@ -423,9 +459,10 @@ function formatDateTime(millis, picture, timezone) {
                 componentValue = 'Christian Era';
                 break;
         }
-        // §9.8.4.3
+        // §9.8.4.3 Formatting Integer-Valued Date/Time Components
         if('YMDdFWwHhms'.indexOf(markerSpec.component) !== -1) {
             if(markerSpec.component === 'Y') {
+                // §9.8.4.4 Formatting the Year Component
                 if(markerSpec.n !== -1) {
                     componentValue = componentValue % Math.pow(10, markerSpec.n);
                 }
@@ -447,7 +484,11 @@ function formatDateTime(millis, picture, timezone) {
             } else {
                 componentValue = formatInteger(componentValue, markerSpec.integerPattern);
             }
-        } else if(markerSpec.component === 'Z') {
+        } else if(markerSpec.component === 'f') {
+            // TODO §9.8.4.5 Formatting Fractional Seconds
+            componentValue = formatInteger(componentValue, markerSpec.integerPattern);
+        } else if(markerSpec.component === 'Z' || markerSpec.component === 'z') {
+            // §9.8.4.6 Formatting timezones
             console.log(offsetHours, offsetMinutes);
             componentValue = timezone ? timezone : 'Z';
         }

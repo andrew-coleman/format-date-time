@@ -364,6 +364,18 @@ describe('#formatDateTime', function () {
             assert.equal(result, expected);
         });
 
+        it('Sunday should be day 7', function () {
+            var result = formatDateTime(1522616700000, '[F0] [FNn]');
+            var expected = '7 Sunday';
+            assert.equal(result, expected);
+        });
+
+        it('Monday should be day 1', function () {
+            var result = formatDateTime(1522703100000, '[F0] [FNn]');
+            var expected = '1 Monday';
+            assert.equal(result, expected);
+        });
+
         it('should format the date in ISO 8601 style', function () {
             var result = formatDateTime(1521801216617, '[Y0001]-[M01]-[D01]');
             var expected = '2018-03-23';
@@ -389,8 +401,20 @@ describe('#formatDateTime', function () {
             var result = formatDateTime(1521801216617, '[Y]-[M01]-[D01]T[H01]:[m]:[s].[f001][Z01:01t]', '+0100');
             var expected = '2018-03-23T11:33:36.617+0100';
             assert.equal(result, expected);
-
         });
+
+        it('should rollover day boundaries', function () {
+            var result = formatDateTime(1204405500000, '[Y]-[M01]-[D01]T[H01]:[m]:[s].[f001][Z01:01t]', '+0530');
+            var expected = '2008-03-02T02:35:00.000+0530';
+            assert.equal(result, expected);
+        });
+
+        it('should rollover year boundaries', function () {
+            var result = formatDateTime(1230757500000, '[Y]-[M01]-[D01]T[H01]:[m]:[s].[f001][Z01:01t]', '+0530');
+            var expected = '2009-01-01T02:35:00.000+0530';
+            assert.equal(result, expected);
+        });
+
     });
 
     describe('width modifier', function () {
@@ -481,6 +505,99 @@ describe('#formatDateTime', function () {
             var expected = 'monday, 7/1/2008 12:00:00 am';
             assert.equal(result, expected);
         });
+    });
+
+    describe('Day of year; week of year; week of month', function () {
+        it('1st Jan should be day 1', function () {
+            var result = formatDateTime(1514808000000, '[dwo] day of the year');
+            var expected = 'first day of the year';
+            assert.equal(result, expected);
+        });
+
+        it('31st Dec should be day 365', function () {
+            var result = formatDateTime(1546257600000, '[d] days in [Y0001]');
+            var expected = '365 days in 2018';
+            assert.equal(result, expected);
+        });
+
+        it('31st Dec should be day 366 in a leap year', function () {
+            var result = formatDateTime(1483185600000, '[d] days in [Y0001]');
+            var expected = '366 days in 2016';
+            assert.equal(result, expected);
+        });
+
+        it('Monday 1st Jan should be in the first week of 2018', function () {
+            var result = formatDateTime(1514808000000, 'Week: [W]');
+            var expected = 'Week: 1';
+            assert.equal(result, expected);
+        });
+
+        it('Sunday 7st Jan should be in the first week of 2018', function () {
+            var result = formatDateTime(1515326400000, 'Week: [W]');
+            var expected = 'Week: 1';
+            assert.equal(result, expected);
+        });
+
+        it('Sunday 25th Dec should be in week 52 of 2018', function () {
+            var result = formatDateTime(1545739200000, 'Week: [W]');
+            var expected = 'Week: 52';
+            assert.equal(result, expected);
+        });
+
+        it('Wed 1st Jan 2014 should be in week 1', function () {
+            var result = formatDateTime(1388577600000, 'Week: [W]');
+            var expected = 'Week: 1';
+            assert.equal(result, expected);
+        });
+
+        it('Mon 29th Dec 2014 should be in week 1 of 2015', function () {
+            var result = formatDateTime(1419854400000, 'Week: [W]');
+            var expected = 'Week: 1';
+            assert.equal(result, expected);
+        });
+
+        it('Sun 28th Dec 2014 should be in week 52 of 2014', function () {
+            var result = formatDateTime(1419768000000, 'Week: [W]');
+            var expected = 'Week: 52';
+            assert.equal(result, expected);
+        });
+
+        it('Tues 23th Dec 2014 should be in week 52 of 2014', function () {
+            var result = formatDateTime(1419336000000, 'Week: [W]');
+            var expected = 'Week: 52';
+            assert.equal(result, expected);
+        });
+
+        it('Thur 1st Jan 2015 should be in week 1 of 2015', function () {
+            var result = formatDateTime(1420113600000, 'Week: [W]');
+            var expected = 'Week: 1';
+            assert.equal(result, expected);
+        });
+
+        it('Mon 5th Jan 2015 should be in week 2 of 2015', function () {
+            var result = formatDateTime(1420459200000, 'Week: [W]');
+            var expected = 'Week: 2';
+            assert.equal(result, expected);
+        });
+
+        it('Mon 28th Dec 2015 should be in week 53 of 2015', function () {
+            var result = formatDateTime(1451304000000, 'Week: [W]');
+            var expected = 'Week: 53';
+            assert.equal(result, expected);
+        });
+
+        it('Thur 31th Dec 2015 should be in week 53 of 2015', function () {
+            var result = formatDateTime(1451563200000, 'Week: [W]');
+            var expected = 'Week: 53';
+            assert.equal(result, expected);
+        });
+
+        it('Sat 2nd Jan 2016 should be in week 53 of 2015', function () {
+            var result = formatDateTime(1451736000000, 'Week: [W]');
+            var expected = 'Week: 53';
+            assert.equal(result, expected);
+        });
+
     });
 
 });
