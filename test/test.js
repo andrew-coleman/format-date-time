@@ -434,6 +434,14 @@ describe('#formatDateTime', function () {
         });
     });
 
+    describe('dates with letters instead of numbers', function () {
+        it('day/month in letters, year in roman numerals', function () {
+            var result = formatDateTime(1521801216617, '[Da] [MA] [Yi]');
+            var expected = 'w C mmxviii';
+            assert.equal(result, expected);
+        });
+    });
+
     describe('ordinals', function () {
         it('day in ordinal numerals', function () {
             var result = formatDateTime(1521801216617, '[D1o] [M01] [Y]');
@@ -474,14 +482,14 @@ describe('#formatDateTime', function () {
         });
 
         it('day/date/month in words', function () {
-            var result = formatDateTime(1521801216617, '[FNn], the [Dwo] of [MNn] [Y]');
-            var expected = 'Friday, the twenty-third of March 2018';
+            var result = formatDateTime(1521801216617, '[FNn], the [Dwo] of [MNn] [Y] [E]');
+            var expected = 'Friday, the twenty-third of March 2018 ISO';
             assert.equal(result, expected);
         });
 
         it('abbreviated day/month in words', function () {
-            var result = formatDateTime(1521801216617, '[FNn,3-3], [D1o] [MNn,3-3] [Y]');
-            var expected = 'Fri, 23rd Mar 2018';
+            var result = formatDateTime(1521801216617, '[FNn,3-3], [D1o] [MNn,3-3] [Y] [C]');
+            var expected = 'Fri, 23rd Mar 2018 ISO';
             assert.equal(result, expected);
         });
 
@@ -598,6 +606,186 @@ describe('#formatDateTime', function () {
             assert.equal(result, expected);
         });
 
+        it('Tue 29th Jan 2013 should be in week 5 of Jan', function () {
+            var result = formatDateTime(1359460800000, 'Week: [w] of [xNn]');
+            var expected = 'Week: 5 of January';
+            assert.equal(result, expected);
+        });
+
+        it('Thur 31st Jan 2013 should be in week 5 of Jan', function () {
+            var result = formatDateTime(1359633600000, 'Week: [w] of [xNn]');
+            var expected = 'Week: 5 of January';
+            assert.equal(result, expected);
+        });
+
+        it('Thur 1st Feb 2013 should be in week 5 of Jan', function () {
+            var result = formatDateTime(1359720000000, 'Week: [w] of [xNn]');
+            var expected = 'Week: 5 of January';
+            assert.equal(result, expected);
+        });
+
+        it('Mon 1st Jan 2018 should be in week 1 of Jan', function () {
+            var result = formatDateTime(1514808000000, 'Week: [w] of [xNn]');
+            var expected = 'Week: 1 of January';
+            assert.equal(result, expected);
+        });
+
+        it('Sun 1st Jan 2017 should be in week 5 of Dec', function () {
+            var result = formatDateTime(1483272000000, 'Week: [w] of [xNn]');
+            var expected = 'Week: 5 of December';
+            assert.equal(result, expected);
+        });
+
+        it('Tues 31st July 2018 should be in week 1 of Aug', function () {
+            var result = formatDateTime(1533038400000, 'Week: [w] of [xNn]');
+            var expected = 'Week: 1 of August';
+            assert.equal(result, expected);
+        });
+
+        it('Tues 30th Dec 2014 should be in week 1 of Jan', function () {
+            var result = formatDateTime(1419940800000, 'Week: [w] of [xNn]');
+            var expected = 'Week: 1 of January';
+            assert.equal(result, expected);
+        });
+
+    });
+
+    describe('ISO week date format', function () {
+        // test data in this section from https://en.wikipedia.org/wiki/ISO_week_date#Relation_with_the_Gregorian_calendar
+
+        it('Sat 1 Jan 2005', function () {
+            var millis = parseDateTime('2005-01-01', '[Y]-[M]-[D]');
+            var result = formatDateTime(millis, '[X0001]-W[W01]-[F1]');
+            var expected = '2004-W53-6';
+            assert.equal(result, expected);
+        });
+
+        it('Sun 2 Jan 2005', function () {
+            var millis = parseDateTime('2005-01-02', '[Y]-[M]-[D]');
+            var result = formatDateTime(millis, '[X0001]-W[W01]-[F1]');
+            var expected = '2004-W53-7';
+            assert.equal(result, expected);
+        });
+
+        it('Sat 31 Dec 2005', function () {
+            var millis = parseDateTime('2005-12-31', '[Y]-[M]-[D]');
+            var result = formatDateTime(millis, '[X0001]-W[W01]-[F1]');
+            var expected = '2005-W52-6';
+            assert.equal(result, expected);
+        });
+
+        it('Sun 1 Jan 2006', function () {
+            var millis = parseDateTime('2006-01-01', '[Y]-[M]-[D]');
+            var result = formatDateTime(millis, '[X0001]-W[W01]-[F1]');
+            var expected = '2005-W52-7';
+            assert.equal(result, expected);
+        });
+
+        it('Mon 2 Jan 2006', function () {
+            var millis = parseDateTime('2006-01-02', '[Y]-[M]-[D]');
+            var result = formatDateTime(millis, '[X0001]-W[W01]-[F1]');
+            var expected = '2006-W01-1';
+            assert.equal(result, expected);
+        });
+
+        it('Sun 31 Dec 2006', function () {
+            var millis = parseDateTime('2006-12-31', '[Y]-[M]-[D]');
+            var result = formatDateTime(millis, '[X0001]-W[W01]-[F1]');
+            var expected = '2006-W52-7';
+            assert.equal(result, expected);
+        });
+
+        it('Mon 1 Jan 2007', function () {
+            var millis = parseDateTime('2007-01-01', '[Y]-[M]-[D]');
+            var result = formatDateTime(millis, '[X0001]-W[W01]-[F1]');
+            var expected = '2007-W01-1';
+            assert.equal(result, expected);
+        });
+
+        it('Sun 30 Dec 2007', function () {
+            var millis = parseDateTime('2007-12-30', '[Y]-[M]-[D]');
+            var result = formatDateTime(millis, '[X0001]-W[W01]-[F1]');
+            var expected = '2007-W52-7';
+            assert.equal(result, expected);
+        });
+
+        it('Mon 31 Dec 2007', function () {
+            var millis = parseDateTime('2007-12-31', '[Y]-[M]-[D]');
+            var result = formatDateTime(millis, '[X0001]-W[W01]-[F1]');
+            var expected = '2008-W01-1';
+            assert.equal(result, expected);
+        });
+
+        it('Tue 1 Jan 2008', function () {
+            var millis = parseDateTime('2008-01-01', '[Y]-[M]-[D]');
+            var result = formatDateTime(millis, '[X0001]-W[W01]-[F1]');
+            var expected = '2008-W01-2';
+            assert.equal(result, expected);
+        });
+
+        it('Sun 28 Dec 2008', function () {
+            var millis = parseDateTime('2008-12-28', '[Y]-[M]-[D]');
+            var result = formatDateTime(millis, '[X0001]-W[W01]-[F1]');
+            var expected = '2008-W52-7';
+            assert.equal(result, expected);
+        });
+
+        it('Mon 29 Dec 2008', function () {
+            var millis = parseDateTime('2008-12-29', '[Y]-[M]-[D]');
+            var result = formatDateTime(millis, '[X0001]-W[W01]-[F1]');
+            var expected = '2009-W01-1';
+            assert.equal(result, expected);
+        });
+
+        it('Tue 30 Dec 2008', function () {
+            var millis = parseDateTime('2008-12-30', '[Y]-[M]-[D]');
+            var result = formatDateTime(millis, '[X0001]-W[W01]-[F1]');
+            var expected = '2009-W01-2';
+            assert.equal(result, expected);
+        });
+
+        it('Wed 31 Dec 2008', function () {
+            var millis = parseDateTime('2008-12-31', '[Y]-[M]-[D]');
+            var result = formatDateTime(millis, '[X0001]-W[W01]-[F1]');
+            var expected = '2009-W01-3';
+            assert.equal(result, expected);
+        });
+
+        it('Thu 1 Jan 2009', function () {
+            var millis = parseDateTime('2009-01-01', '[Y]-[M]-[D]');
+            var result = formatDateTime(millis, '[X0001]-W[W01]-[F1]');
+            var expected = '2009-W01-4';
+            assert.equal(result, expected);
+        });
+
+        it('Thu 31 Dec 2009', function () {
+            var millis = parseDateTime('2009-12-31', '[Y]-[M]-[D]');
+            var result = formatDateTime(millis, '[X0001]-W[W01]-[F1]');
+            var expected = '2009-W53-4';
+            assert.equal(result, expected);
+        });
+
+        it('Fri 1 Jan 2010', function () {
+            var millis = parseDateTime('2010-01-01', '[Y]-[M]-[D]');
+            var result = formatDateTime(millis, '[X0001]-W[W01]-[F1]');
+            var expected = '2009-W53-5';
+            assert.equal(result, expected);
+        });
+
+        it('Sat 2 Jan 2010', function () {
+            var millis = parseDateTime('2010-01-02', '[Y]-[M]-[D]');
+            var result = formatDateTime(millis, '[X0001]-W[W01]-[F1]');
+            var expected = '2009-W53-6';
+            assert.equal(result, expected);
+        });
+
+        it('Sun 3 Jan 2010', function () {
+            var millis = parseDateTime('2010-01-03', '[Y]-[M]-[D]');
+            var result = formatDateTime(millis, '[X0001]-W[W01]-[F1]');
+            var expected = '2009-W53-7';
+            assert.equal(result, expected);
+        });
+
     });
 
 });
@@ -682,6 +870,22 @@ describe('#parseDateTime', function () {
 
     });
 
+    describe('dates with letters instead of numbers', function () {
+        it('day/month in letters, year in roman numerals', function () {
+            var result = parseDateTime('w C mmxviii', '[Da] [MA] [Yi]');
+            console.log(new Date(result));
+            var expected = new Date('2018-03-23T00:00:00.000Z');
+            assert.equal(result, expected.getTime());
+        });
+
+        it('day/month in letters, year in roman numerals', function () {
+            var result = parseDateTime('ae C mmxviii', '[Da] [MA] [Yi]');
+            console.log(new Date(result));
+            var expected = new Date('2018-03-31T00:00:00.000Z');
+            assert.equal(result, expected.getTime());
+        });
+    });
+
     describe('months in words', function () {
         it('should parse year/month/day', function () {
             var result = parseDateTime('27th April 2008', '[D1o] [MNn] [Y0001]');
@@ -748,5 +952,38 @@ describe('#parseDateTime', function () {
 
     });
 
+    describe('12 hour clock', function () {
+        it('just after midnight', function () {
+            var result = parseDateTime('4/4/2018 12:06 am', '[D1]/[M1]/[Y0001] [h]:[m] [P]');
+            var expected = new Date('2018-04-04T00:06:00.000Z');
+            assert.equal(result, expected.getTime());
+        });
 
+        it('breakfast time', function () {
+            var result = parseDateTime('4/4/2018 06:30 am', '[D1]/[M1]/[Y0001] [h]:[m] [P]');
+            var expected = new Date('2018-04-04T06:30:00.000Z');
+            assert.equal(result, expected.getTime());
+        });
+
+        it('just after midday', function () {
+            var result = parseDateTime('4/4/2018 12:06 pm', '[D1]/[M1]/[Y0001] [h]:[m] [P]');
+            var expected = new Date('2018-04-04T12:06:00.000Z');
+            assert.equal(result, expected.getTime());
+        });
+
+        it('just before midnight', function () {
+            var result = parseDateTime('4/4/2018 11:30 pm', '[D1]/[M1]/[Y0001] [h]:[m] [P]');
+            var expected = new Date('2018-04-04T23:30:00.000Z');
+            assert.equal(result, expected.getTime());
+        });
+    });
+
+    describe('derive the date', function () {
+        it('ordinal date: day 94 of the year 2018', function () {
+            var result = parseDateTime('2018-094', '[Y0001]-[d001]');
+            console.log('derived', new Date(result));
+            var expected = new Date('2018-04-04T00:00:00.000Z');
+            assert.equal(result, expected.getTime());
+        });
+    });
 });

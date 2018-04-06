@@ -141,6 +141,25 @@ function romanToDecimal(roman) {
     return decimal;
 }
 
+function decimalToLetters(value, aChar) {
+    var letters = [];
+    var aCode = aChar.charCodeAt(0);
+    while (value > 0) {
+        letters.unshift(String.fromCharCode((value - 1) % 26 + aCode));
+        value = Math.floor((value - 1) / 26);
+    }
+    return letters.join('');
+}
+
+function lettersToDecimal(letters, aChar) {
+    var aCode = aChar.charCodeAt(0);
+    var decimal = 0;
+    for(var i = 0; i < letters.length; i++) {
+        decimal += (letters.charCodeAt(letters.length - i - 1) - aCode + 1) * Math.pow(26, i);
+    }
+    return decimal;
+}
+
 function formatInteger(value, picture) {
     if(typeof value === 'undefined') {
         return undefined;
@@ -174,13 +193,7 @@ function formatInteger(value, picture) {
     switch(picture[0]) {
         case 'A':
         case 'a':
-            var letters = [];
-            var aCode = picture[0].charCodeAt(0);
-            while (value > 0) {
-                letters.unshift(String.fromCharCode((value - 1) % 26 + aCode));
-                value = Math.floor((value - 1) / 26);
-            }
-            formattedInteger = letters.join('');
+            formattedInteger = decimalToLetters(value, picture[0]);
             break;
         case 'i':
         case 'I':
@@ -222,7 +235,7 @@ function formatInteger(value, picture) {
 }
 
 const defaultPresentationModifiers = {
-    Y: '1', M: '1', D: '1', d: '1', F: 'n', W: '1', w: '1', H: '1', h: '1',
+    Y: '1', M: '1', D: '1', d: '1', F: 'n', W: '1', w: '1', X: '1', x: '1', H: '1', h: '1',
     P: 'n', m: '01', s: '01', f: '1', Z: '01:01', z: '01:01', C: 'n', E: 'n'
 };
 
@@ -302,7 +315,7 @@ function analysePicture(picture) {
                     }
                 }
             }
-            if('YMDdFWwHhmsf'.indexOf(def.component) !== -1 && def.presentation1[0] !== 'N' && def.presentation1[0] !== 'n') {
+            if('YMDdFWwXxHhmsf'.indexOf(def.component) !== -1 && def.presentation1[0] !== 'N' && def.presentation1[0] !== 'n') {
                 var integerPattern = def.presentation1;
                 if (typeof integerPattern === 'undefined') {
                     integerPattern = '0';
@@ -348,6 +361,47 @@ const days = ['', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Satur
 const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const millisInADay = 1000 * 60 * 60 * 24;
 
+const startOfFirstWeek = function(ym) {
+    // ISO 8601 defines the first week of the year to be the week that contains the first Thursday
+    // XPath F&O extends this same definition for the first week of a month
+    // the week starts on a Monday - calculate the millis for the start of the first week
+    // millis for given 1st Jan of that year (at 00:00 UTC)
+    const jan1 = Date.UTC(ym.year, ym.month);
+    var dayOfJan1 = (new Date(jan1)).getDay();
+    if (dayOfJan1 === 0) {
+        dayOfJan1 = 7;
+    }
+    // if Jan 1 is Fri, Sat or Sun, then add the number of days (in millis) to jan1 to get the start of week 1
+    return dayOfJan1 > 4 ? jan1 + (8 - dayOfJan1) * millisInADay : jan1 - (dayOfJan1 - 1) * millisInADay;
+};
+
+const yearMonth = function (year, month) {
+    return {
+        year: year,
+        month: month,
+        nextMonth: function() {
+            return (month === 11) ? yearMonth(year + 1, 0) : yearMonth(year, month + 1);
+        },
+        previousMonth: function() {
+            return (month === 0) ? yearMonth(year - 1, 11) : yearMonth(year, month - 1);
+        },
+        nextYear: function () {
+            return yearMonth(year + 1, month);
+        },
+        previousYear: function () {
+            return yearMonth(year - 1, month);
+        }
+    }
+};
+
+const deltaWeeks = function(start, end) {
+    return (end - start) / (millisInADay * 7) + 1;
+};
+
+String.prototype.replaceAt = function(index, replacement) {
+    return this.substr(0, index) + replacement+ this.substr(index + replacement.length);
+};
+
 function formatDateTime(millis, picture, timezone) {
     if(typeof millis === 'undefined') {
         return undefined;
@@ -363,10 +417,6 @@ function formatDateTime(millis, picture, timezone) {
         offsetMinutes = offset % 100;
     }
 
-    String.prototype.replaceAt = function(index, replacement) {
-        return this.substr(0, index) + replacement+ this.substr(index + replacement.length);
-    };
-
     var formatComponent = function(date, markerSpec) {
         var componentValue;
         switch (markerSpec.component) {
@@ -379,13 +429,14 @@ function formatDateTime(millis, picture, timezone) {
             case 'D':
                 componentValue = date.getDate();
                 break;
-            case 'd':
+            case 'd': {
                 // millis for given date (at 00:00 UTC)
                 const today = Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
                 // millis for given 1st Jan of that year (at 00:00 UTC)
                 const firstJan = Date.UTC(date.getFullYear(), 0);
                 componentValue = (today - firstJan) / millisInADay + 1;
                 break;
+            }
             case 'F':
                 componentValue = date.getDay();
                 if(componentValue === 0) {
@@ -393,39 +444,81 @@ function formatDateTime(millis, picture, timezone) {
                     componentValue = 7;
                 }
                 break;
-            case 'W':
-                const startOfFirstWeek = function(year) {
-                    // ISO 8601 defines the first week of the year to be the week that contains the first Thursday
-                    // the week starts on a Monday - calculate the millis for the start of the first week
-                    // millis for given 1st Jan of that year (at 00:00 UTC)
-                    const jan1 = Date.UTC(year, 0);
-                    var dayOfJan1 = (new Date(jan1)).getDay();
-                    if (dayOfJan1 === 0) {
-                        dayOfJan1 = 7;
-                    }
-                    // if Jan 1 is Fri, Sat or Sun, then add the number of days (in millis) to jan1 to get the start of week 1
-                    return dayOfJan1 > 4 ? jan1 + (8 - dayOfJan1) * millisInADay : jan1 - (dayOfJan1 - 1) * millisInADay;
-                };
-
-                const startOfWeek1 = startOfFirstWeek(date.getFullYear());
-                const today2 = Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
-                var week = (today2 - startOfWeek1) / (millisInADay * 7) + 1;
-                if(week > 52) {
+            case 'W': {
+                const thisYear = yearMonth(date.getFullYear(), 0);
+                const startOfWeek1 = startOfFirstWeek(thisYear);
+                const today = Date.UTC(thisYear.year, date.getMonth(), date.getDate());
+                let week = deltaWeeks(startOfWeek1, today);
+                if (week > 52) {
                     // might be first week of the following year
-                    const startOfFollowingYear = startOfFirstWeek(date.getFullYear() + 1);
-                    if(today2 >= startOfFollowingYear) {
+                    const startOfFollowingYear = startOfFirstWeek(thisYear.nextYear());
+                    if (today >= startOfFollowingYear) {
                         week = 1;
                     }
-                } else if(week < 1) {
-                    // might be end of the previous year
-                    const startOfPreviousYear = startOfFirstWeek(date.getFullYear() - 1);
-                    week = (today2 - startOfPreviousYear) / (millisInADay * 7) + 1;
+                } else if (week < 1) {
+                    // must be end of the previous year
+                    const startOfPreviousYear = startOfFirstWeek(thisYear.previousYear());
+                    week = deltaWeeks(startOfPreviousYear, today);
                 }
                 componentValue = Math.floor(week);
                 break;
-            case 'w':
-                componentValue = date.getDate();  // TODO week of the month
+            }
+            case 'w':{
+                const thisMonth = yearMonth(date.getFullYear(), date.getMonth());
+                const startOfWeek1 = startOfFirstWeek(thisMonth);
+                const today = Date.UTC(thisMonth.year, thisMonth.month, date.getDate());
+                let week = deltaWeeks(startOfWeek1, today);
+                if (week > 4) {
+                    // might be first week of the following month
+                    const startOfFollowingMonth = startOfFirstWeek(thisMonth.nextMonth());
+                    if (today >= startOfFollowingMonth) {
+                        week = 1;
+                    }
+                } else if (week < 1) {
+                    // must be end of the previous month
+                    const startOfPreviousMonth = startOfFirstWeek(thisMonth.previousMonth());
+                    week = deltaWeeks(startOfPreviousMonth, today);
+                }
+                componentValue = Math.floor(week);
                 break;
+            }
+            case 'X': {
+                // Extension: The F&O spec says nothing about how to access the year associated with the week-of-the-year
+                // e.g. Sat 1 Jan 2005 is in the 53rd week of 2004.
+                // The 'W' component specifier gives 53, but 'Y' will give 2005.
+                // I propose to add 'X' as the component specifier to give the ISO week-numbering year (2004 in this example)
+                const thisYear = yearMonth(date.getFullYear(), 0);
+                const startOfISOYear = startOfFirstWeek(thisYear);
+                const endOfISOYear = startOfFirstWeek(thisYear.nextYear());
+                const now = date.getTime();
+                if(now < startOfISOYear) {
+                    componentValue = thisYear.year - 1;
+                } else if(now >= endOfISOYear) {
+                    componentValue = thisYear.year + 1;
+                } else {
+                    componentValue = thisYear.year;
+                }
+                break;
+            }
+            case 'x': {
+                // Extension: The F&O spec says nothing about how to access the month associated with the week-of-the-month
+                // e.g. Sat 1 Jan 2005 is in the 5th week of December 2004.
+                // The 'w' component specifier gives 5, but 'W' will give January and 'Y' will give 2005.
+                // I propose to add 'x' as the component specifier to give the 'week-numbering' month (December in this example)
+                const thisMonth = yearMonth(date.getFullYear(), date.getMonth());
+                const startOfISOMonth = startOfFirstWeek(thisMonth);
+                const nextMonth = thisMonth.nextMonth();
+                const endOfISOMonth = startOfFirstWeek(nextMonth);
+                const now = date.getTime();
+                if(now < startOfISOMonth) {
+                    componentValue = thisMonth.previousMonth().month + 1;
+                } else if(now >= endOfISOMonth) {
+                    componentValue = nextMonth.month + 1;
+                } else {
+                    componentValue = thisMonth.month + 1;
+                }
+                break;
+            }
             case 'H':
                 componentValue = date.getHours();
                 break;
@@ -453,14 +546,14 @@ function formatDateTime(millis, picture, timezone) {
                 // since the date object is constructed from epoch millis, the TZ component is always be UTC.
                 break;
             case 'C':
-                componentValue = 'AD';
+                componentValue = 'ISO';
                 break;
             case 'E':
-                componentValue = 'Christian Era';
+                componentValue = 'ISO';
                 break;
         }
         // §9.8.4.3 Formatting Integer-Valued Date/Time Components
-        if('YMDdFWwHhms'.indexOf(markerSpec.component) !== -1) {
+        if('YMDdFWwXxHhms'.indexOf(markerSpec.component) !== -1) {
             if(markerSpec.component === 'Y') {
                 // §9.8.4.4 Formatting the Year Component
                 if(markerSpec.n !== -1) {
@@ -468,7 +561,7 @@ function formatDateTime(millis, picture, timezone) {
                 }
             }
             if(markerSpec.presentation1 === 'Nn' || markerSpec.presentation1 === 'N' || markerSpec.presentation1 === 'n') {
-                if(markerSpec.component === 'M') {
+                if(markerSpec.component === 'M' || markerSpec.component === 'x') {
                     componentValue = months[componentValue - 1];
                 } else if(markerSpec.component === 'F') {
                     componentValue = days[componentValue];
@@ -488,7 +581,7 @@ function formatDateTime(millis, picture, timezone) {
             // TODO §9.8.4.5 Formatting Fractional Seconds
             componentValue = formatInteger(componentValue, markerSpec.integerPattern);
         } else if(markerSpec.component === 'Z' || markerSpec.component === 'z') {
-            // §9.8.4.6 Formatting timezones
+            // TODO §9.8.4.6 Formatting timezones
             console.log(offsetHours, offsetMinutes);
             componentValue = timezone ? timezone : 'Z';
         }
@@ -522,9 +615,11 @@ function generateRegex(formatSpec) {
                 switch(part.integerPattern[0]) {
                     case 'a':
                         part.regex = '[a-z]+';
+                        part.parse = function(value) { return lettersToDecimal(value, 'a'); };
                         break;
                     case 'A':
                         part.regex = '[A-Z]+';
+                        part.parse = function(value) { return lettersToDecimal(value, 'A'); };
                         break;
                     case 'i':
                         part.regex = '[mdclxvi]+';
@@ -552,7 +647,7 @@ function generateRegex(formatSpec) {
                 // must be a month or day name
                 part.regex = '[a-zA-Z]+';
                 var lookup = {};
-                if(part.component === 'M') {
+                if(part.component === 'M' || part.component === 'x') {
                     // months
                     months.forEach(function(name, index) {
                         if(part.width && part.width.max) {
@@ -561,6 +656,8 @@ function generateRegex(formatSpec) {
                             lookup[name] = index + 1;
                         }
                     });
+                } else if(part.component === 'P') {
+                    lookup = {'am': 0, 'AM': 0, 'pm': 1, 'PM': 1};
                 }
                 part.parse = function(value) { return lookup[value] };
             }
@@ -579,59 +676,51 @@ function parseDateTime(timestamp, picture) {
         return '(' + part.regex + ')';
     }).join('') + '$';
 
-    const setComponent = function(date, component, value) {
-        switch(component) {
-            case 'Y':
-                date.setUTCFullYear(value);
-                break;
-            case 'M':
-                date.setUTCMonth(value - 1);
-                break;
-            case 'D':
-                date.setUTCDate(value);
-                break;
-            case 'H':
-                date.setUTCHours(value);
-                break;
-            case 'h':
-                date.setHours(value);  // TODO 12 hour format - lookup P component
-                break;
-            case 'm':
-                date.setUTCMinutes(value);
-                break;
-            case 's':
-                date.setUTCSeconds(value);
-                break;
-            case 'f':
-                date.setMilliseconds(value);
-                break;
-            case 'Z':
-                date.setDate();  // TODO
-                break;
-            case 'z':
-                date.setDate();  // TODO
-                break;
-            default:
-                // ignore
-        }
-    };
-
     const matcher = new RegExp(fullRegex, 'i'); // TODO can cache this against the picture
     var info = matcher.exec(timestamp);
     if(info !== null) {
-        var date = new Date(0, 0, 1, 0, 0, 0);
-        var values = {};
+        var components = {D: 1, m: 0, s: 0, f: 0};
         for(var i = 1; i < info.length; i++) {
             const part = formatSpec[i-1];
             if(part.type === 'marker') {
-                values[part.component] = info[i];
-                setComponent(date, part.component, part.parse(info[i]));
+                components[part.component] = parseInt(part.parse(info[i]));
             }
         }
-        if(Object.keys(values).length === 0) {
+
+        // validate and fill in components
+        if(typeof components.M !== 'undefined') {
+            components.M -= 1;  // Date.UTC requires a zero-indexed month
+        } else {
+            components.M = 0; // default to January
+        }
+        if(typeof components.d !== 'undefined') {
+            // TODO should we throw errors if 'd' is found when 'M' & 'D' is also present?
+            // millis for given 1st Jan of that year (at 00:00 UTC)
+            const firstJan = Date.UTC(components.Y, 0);
+            const offsetMillis = components.d * 1000 * 60 * 60 * 24;
+            const derivedDate = new Date(firstJan + offsetMillis);
+            components.M = derivedDate.getMonth();
+            components.D = derivedDate.getDay();
+        }
+        if(typeof components.H === 'undefined') {
+            if(components.h !== 'undefined' && typeof components.P !== 'undefined') {
+                // 12hr to 24hr
+                components.H = components.h === 12 ? 0 : components.h;
+                if (components.P === 1) {
+                    components.H += 12;
+                }
+            } else {
+                // TODO only apply default if the m, s & f are unspecified
+                components.H = 0; // default to midnight
+            }
+        }
+        if(typeof components.Y === 'undefined') {
             return undefined;
         }
-        return date.getTime();
+
+        var millis = Date.UTC(components.Y, components.M, components.D, components.H, components.m, components.s, components.f);
+        console.log('parse: ', components);
+        return millis;
     }
 }
 
