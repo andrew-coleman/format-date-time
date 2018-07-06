@@ -83,6 +83,66 @@ describe('#formatInteger', function () {
 
     });
 
+    describe('decimal-digit-pattern - unicode decimal groups', function() {
+        it('should insert regular groups', function() {
+            var result = formatInteger(12340, '###\u0661');
+            var expected = '\u0661\u0662\u0663\u0664\u0660'; // ١٢٣٤٠
+            assert.equal(result, expected);
+        });
+
+        it('should insert regular groups', function() {
+            var result = formatInteger(12340, '###\uff10');
+            var expected = '\uff11\uff12\uff13\uff14\uff10'; // １２３４０
+            assert.equal(result, expected);
+        });
+
+    });
+
+    describe('decimal-digit-pattern - grouping separator', function() {
+        it('should insert regular groups', function() {
+            var result = formatInteger(12, '#,##0');
+            var expected = '12';
+            assert.equal(result, expected);
+        });
+
+        it('should insert regular groups', function() {
+            var result = formatInteger(1200, '#,##0');
+            var expected = '1,200';
+            assert.equal(result, expected);
+        });
+
+        it('should insert regular groups', function() {
+            var result = formatInteger(12345678, '#,##0');
+            var expected = '12,345,678';
+            assert.equal(result, expected);
+        });
+
+        it('should insert regular groups', function() {
+            var result = formatInteger(1234567890, '#,##0');
+            var expected = '1,234,567,890';
+            assert.equal(result, expected);
+        });
+
+        it('should insert regular groups', function() {
+            var result = formatInteger(1234567890, '#,###,##0');
+            var expected = '1,234,567,890';
+            assert.equal(result, expected);
+        });
+
+        it('should insert non-regular groups - different chars', function() {
+            var result = formatInteger(1234567890, '#:###,##0');
+            var expected = '1234:567,890';
+            assert.equal(result, expected);
+        });
+
+        it('should insert non-regular groups - different positions', function() {
+            var result = formatInteger(1234567890, '##,##,##0');
+            var expected = '12345,67,890';
+            assert.equal(result, expected);
+        });
+
+    });
+
     describe('roman numerals', function () {
         it('0', function () {
             var result = formatInteger(0, 'I');

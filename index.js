@@ -98,28 +98,28 @@ function wordsToNumber(text) {
 }
 
 const romanNumerals = [
-    [1000, 'M', 'm'],
-    [900, 'CM', 'cm'],
-    [500, 'D', 'd'],
-    [400, 'CD', 'cd'],
-    [100, 'C', 'c'],
-    [90, 'XC', 'xc'],
-    [50, 'L', 'l'],
-    [40, 'XL', 'xl'],
-    [10, 'X', 'x'],
-    [9, 'IX', 'ix'],
-    [5, 'V', 'v'],
-    [4, 'IV', 'iv'],
-    [1, 'I', 'i']
+    [1000, 'm'],
+    [900, 'cm'],
+    [500, 'd'],
+    [400, 'cd'],
+    [100, 'c'],
+    [90, 'xc'],
+    [50, 'l'],
+    [40, 'xl'],
+    [10, 'x'],
+    [9, 'ix'],
+    [5, 'v'],
+    [4, 'iv'],
+    [1, 'i']
 ];
 
 const romanValues = { 'M': 1000, 'D': 500, 'C': 100, 'L': 50, 'X': 10, 'V': 5, 'I': 1};
 
-function decimalToRoman(value, uppercase) {
+function decimalToRoman(value) {
     for(var index = 0; index < romanNumerals.length; index++) {
         const numeral = romanNumerals[index];
         if(value >= numeral[0]) {
-            return numeral[uppercase ? 1 : 2] + decimalToRoman(value - numeral[0], uppercase);
+            return numeral[1] + decimalToRoman(value - numeral[0]);
         }
     }
     return '';
@@ -161,66 +161,60 @@ function lettersToDecimal(letters, aChar) {
 }
 
 function formatInteger(value, picture) {
-    if(typeof value === 'undefined') {
+    if (typeof value === 'undefined') {
         return undefined;
     }
-    
-    var formattedInteger;
 
-    const count = function(str, char) {
-        var count = 0;
-        for(var i = 0; i < str.length; i++) {
-            if(str.charAt(i) === char) {
-                count++;
+    const format = analyseIntegerPicture(picture);
+    return _formatInteger(value, format);
+}
+
+function _formatInteger(value, format) {
+    let formattedInteger;
+    switch(format.primary) {
+        case formats.LETTERS:
+            formattedInteger = decimalToLetters(value, format.case === tcase.UPPER ? 'A' : 'a');
+            break;
+        case formats.ROMAN:
+            formattedInteger = decimalToRoman(value);
+            if(format.case === tcase.UPPER) {
+                formattedInteger = formattedInteger.toUpperCase();
             }
-        }
-        return count;
-    };
-    
-    var primaryFormat, formatModifier;
-    var ordinal = false;
-    var semicolon = picture.lastIndexOf(';');
-    if(semicolon === -1) {
-        primaryFormat = picture;
-    } else {
-        primaryFormat = picture.substring(0, semicolon);
-        formatModifier = picture.substring(semicolon + 1);
-        if(formatModifier[0] === 'o') {
-            ordinal = true;
-        }
-    }
-    
-    switch(picture[0]) {
-        case 'A':
-        case 'a':
-            formattedInteger = decimalToLetters(value, picture[0]);
             break;
-        case 'i':
-        case 'I':
-            formattedInteger = decimalToRoman(value, picture[0] === 'I');
+        case formats.WORDS:
+            formattedInteger = numberToWords(value, format.ordinal);
+            if(format.case === tcase.UPPER) {
+                formattedInteger = formattedInteger.toUpperCase();
+            }
             break;
-        case 'w':
-            formattedInteger = numberToWords(value, ordinal);
-            break;
-        case 'W': // TODO check for Ww
-            formattedInteger = numberToWords(value, ordinal).toUpperCase();
-            break;
-        default:
-            // decimal-digit-pattern
-            const optionalDigits = count(primaryFormat, '#');
-            const groupingSeparators = count(primaryFormat, ',');
-            const mandatoryDigits = primaryFormat.length - optionalDigits - groupingSeparators;
-
+        case formats.DECIMAL:
             formattedInteger = '' + value;
-
             // TODO use functionPad
-            var padLength = mandatoryDigits - formattedInteger.length;
+            var padLength = format.mandatoryDigits - formattedInteger.length;
             if (padLength > 0) {
                 var padding = (new Array(padLength + 1)).join('0');
                 formattedInteger = padding + formattedInteger;
             }
-            
-            if(ordinal) {
+            if(format.zeroCode !== 0x30) {
+                formattedInteger = Array.from(formattedInteger).map(code => {
+                    return String.fromCodePoint(code.codePointAt(0) + format.zeroCode - 0x30);
+                }).join('');
+            }
+            // insert the grouping-separator-signs, if any
+            if(format.regular) {
+                const n = Math.floor(formattedInteger.length / format.groupingSeparators.position);
+                for(let ii = n; ii > 0; ii--) {
+                    const pos = formattedInteger.length - ii * format.groupingSeparators.position;
+                    formattedInteger = formattedInteger.substr(0, pos) + format.groupingSeparators.character + formattedInteger.substr(pos);
+                }
+            } else {
+                format.groupingSeparators.reverse().forEach(separator => {
+                    const pos = formattedInteger.length - separator.position;
+                    formattedInteger = formattedInteger.substr(0, pos) + separator.character + formattedInteger.substr(pos);
+                })
+            }
+
+            if(format.ordinal) {
                 var suffix123 = {'1': 'st', '2': 'nd', '3': 'rd'};
                 var lastDigit = formattedInteger[formattedInteger.length - 1];
                 var suffix = suffix123[lastDigit];
@@ -229,9 +223,170 @@ function formatInteger(value, picture) {
                 }
                 formattedInteger = formattedInteger + suffix;
             }
+            break;
+        case formats.SEQUENCE:
+            throw {
+                code: 'unsupported: sequence'
+            }
     }
 
     return formattedInteger;
+}
+
+const formats = {
+    DECIMAL: 'decimal',
+    LETTERS: 'letters',
+    ROMAN: 'roman',
+    WORDS: 'words',
+    SEQUENCE: 'sequence'
+};
+
+const tcase = {
+    UPPER: 'upper',
+    LOWER: 'lower',
+    TITLE: 'title'
+};
+
+//TODO what about decimal groups in the unicode supplementary planes (surrogate pairs) ???
+const decimalGroups = [0x30, 0x0660, 0x06F0, 0x07C0, 0x0966, 0x09E6, 0x0A66, 0x0AE6, 0x0B66, 0x0BE6, 0x0C66, 0x0CE6, 0x0D66, 0x0DE6, 0x0E50, 0x0ED0, 0x0F20, 0x1040, 0x1090, 0x17E0, 0x1810, 0x1946, 0x19D0, 0x1A80, 0x1A90, 0x1B50, 0x1BB0, 0x1C40, 0x1C50, 0xA620, 0xA8D0, 0xA900, 0xA9D0, 0xA9F0, 0xAA50, 0xABF0, 0xFF10];
+
+function analyseIntegerPicture(picture) {
+    const format = {
+        primary: formats.DECIMAL,
+        case: tcase.LOWER,
+        ordinal: false
+    };
+
+    let primaryFormat, formatModifier;
+    const semicolon = picture.lastIndexOf(';');
+    if(semicolon === -1) {
+        primaryFormat = picture;
+    } else {
+        primaryFormat = picture.substring(0, semicolon);
+        formatModifier = picture.substring(semicolon + 1);
+        if(formatModifier[0] === 'o') {
+            format.ordinal = true;
+        }
+    }
+
+    switch(primaryFormat) {
+        case 'A':
+            format.case = tcase.UPPER;
+        case 'a':
+            format.primary = formats.LETTERS;
+            break;
+        case 'I':
+            format.case = tcase.UPPER;
+        case 'i':
+            format.primary = formats.ROMAN;
+            break;
+        case 'W':
+            format.case = tcase.UPPER;
+            if(picture[1] === 'w') {
+                format.case = tcase.TITLE;
+            }
+        case 'w':
+            format.primary = formats.WORDS;
+            break;
+        default:
+            // this is a decimal-digit-pattern if it contains a decimal digit (from any unicode decimal digit group)
+            let zeroCode = null;
+            let mandatoryDigits = 0;
+            let groupingSeparators = [];
+            let separatorPosition = 0;
+            const formatCodepoints = Array.from(primaryFormat, c => c.codePointAt(0)).reverse(); // reverse the array to determine positions of grouping-separator-signs
+            formatCodepoints.forEach((codePoint) => {
+                // step though each char in the picture to determine the digit group
+                let digit = false;
+                for(let ii = 0; ii < decimalGroups.length; ii++) {
+                    const group = decimalGroups[ii];
+                    if (codePoint >= group && codePoint <= group + 9) {
+                        // codepoint is part of this decimal group
+                        digit = true;
+                        mandatoryDigits++;
+                        separatorPosition++;
+                        if (zeroCode === null) {
+                            zeroCode = group;
+                        } else if (group !== zeroCode) {
+                            // error! different decimal groups in the same pattern
+                            throw {
+                                code: 'whatever'
+                            }
+                        }
+                        break;
+                    }
+                }
+                if(!digit) {
+                    if (codePoint === 0x23) { // # - optional-digit-sign
+                        separatorPosition++;
+                    } else {
+                        // neither a decimal-digit-sign ot optional-digit-sign, assume it is a grouping-separator-sign
+                        groupingSeparators.push({
+                            position: separatorPosition,
+                            character: String.fromCodePoint(codePoint)
+                        });
+                    }
+                }
+            });
+            if(mandatoryDigits > 0) {
+                format.primary = formats.DECIMAL;
+                // TODO validate decimal-digit-pattern
+
+                // the decimal digit family (codepoint offset)
+                format.zeroCode = zeroCode;
+                // the number of mandatory digits
+                format.mandatoryDigits = mandatoryDigits;
+                // grouping separator template
+                // are the grouping-separator-signs 'regular'?
+                const regularRepeat = function(separators) {
+                    // are the grouping positions regular? i.e. same interval between each of them
+                    // is there at least one separator?
+                    if(separators.length === 0) {
+                        return 0;
+                    }
+                    // are all the characters the same?
+                    const sepChar = separators[0].character;
+                    for(let ii = 1; ii < separators.length; ii++) {
+                        if(separators[ii].character !== sepChar) {
+                            return 0;
+                        }
+                    }
+                    // are they equally spaced?
+                    const indexes = separators.map(separator => separator.position);
+                    const gcd = function(a, b) {
+                        return b === 0 ? a : gcd(b, a % b);
+                    };
+                    // find the greatest common divisor of all the positions
+                    const factor = indexes.reduce(gcd);
+                    // is every position separated by this divisor? If so, it's regular
+                    for(let index = 1; index <= indexes.length; index++) {
+                        if(indexes.indexOf(index * factor) === -1) {
+                            return 0;
+                        }
+                    }
+                    return factor;
+                };
+
+                const regular = regularRepeat(groupingSeparators);
+                if(regular > 0) {
+                    format.regular = true;
+                    format.groupingSeparators = {
+                        position: regular,
+                        character: groupingSeparators[0].character
+                    }
+                } else {
+                    format.regular = false;
+                    format.groupingSeparators = groupingSeparators;
+                }
+
+            } else {
+                // this is a 'numbering sequence' which the spec says is implementation-defined
+                // this implementation doesn't support any numbering sequences at the moment.
+                format.primary = formats.SEQUENCE;
+            }
+    }
+
+    return format;
 }
 
 const defaultPresentationModifiers = {
@@ -239,8 +394,8 @@ const defaultPresentationModifiers = {
     P: 'n', m: '01', s: '01', f: '1', Z: '01:01', z: '01:01', C: 'n', E: 'n'
 };
 
-// the format specifier is an array of string literals and variable markers
-function analysePicture(picture) {
+// §9.8.4.1 the format specifier is an array of string literals and variable markers
+function analyseDateTimePicture(picture) {
     var spec = [];
     var start = 0, pos = 0;
     while(pos < picture.length) {
@@ -255,12 +410,13 @@ function analysePicture(picture) {
             pos = picture.indexOf(']', start);
             // TODO handle error case if pos === -1
             const marker = picture.substring(start+1, pos);
+            // TODO whitespace within a variable marker is ignored (i.e. remove it)
             var def = {
                 type: 'marker',
-                component: marker.charAt(0)
+                component: marker.charAt(0)  // 1. The component specifier is always present and is always a single letter.
             };
-            var comma = marker.lastIndexOf(',');
-            var presMod;
+            var comma = marker.lastIndexOf(','); // 2. The width modifier may be recognized by the presence of a comma
+            var presMod; // the presentation modifiers
             if(comma !== -1) {
                 // §9.8.4.2 The Width Modifier
                 var widthDef;
@@ -287,7 +443,8 @@ function analysePicture(picture) {
                 presMod = marker.substring(1);
             }
             if(presMod.length === 1) {
-                def.presentation1 = presMod;
+                def.presentation1 = presMod; // first presentation modifier
+                //TODO validate the first presentation modifier - it's either N, n, Nn or it passes analyseIntegerPicture
             } else if(presMod.length > 1) {
                 var lastChar = presMod.charAt(presMod.length - 1);
                 if('atco'.indexOf(lastChar) !== -1) {
@@ -298,6 +455,8 @@ function analysePicture(picture) {
                     def.presentation1 = presMod.substring(0, presMod.length - 1);
                 } else {
                     def.presentation1 = presMod;
+                    //TODO validate the first presentation modifier - it's either N, n, Nn or it passes analyseIntegerPicture,
+                    // doesn't use ] as grouping separator, and if grouping separator is , then must have width modifier
                 }
             } else {
                 // no presentation modifier specified - apply the default;
@@ -344,6 +503,7 @@ function analysePicture(picture) {
                     integerPattern += ';' + def.presentation2;
                 }
                 def.integerPattern = integerPattern;
+                def.integerFormat = analyseIntegerPicture(integerPattern);
             }
             spec.push(def);
             start = pos + 1;
@@ -575,11 +735,11 @@ function formatDateTime(millis, picture, timezone) {
                     componentValue = componentValue.substring(0, markerSpec.width.max);
                 }
             } else {
-                componentValue = formatInteger(componentValue, markerSpec.integerPattern);
+                componentValue = _formatInteger(componentValue, markerSpec.integerFormat);
             }
         } else if(markerSpec.component === 'f') {
             // TODO §9.8.4.5 Formatting Fractional Seconds
-            componentValue = formatInteger(componentValue, markerSpec.integerPattern);
+            componentValue = _formatInteger(componentValue, markerSpec.integerFormat);
         } else if(markerSpec.component === 'Z' || markerSpec.component === 'z') {
             // TODO §9.8.4.6 Formatting timezones
             console.log(offsetHours, offsetMinutes);
@@ -588,7 +748,7 @@ function formatDateTime(millis, picture, timezone) {
         return componentValue;
     };
 
-    var formatSpec =  analysePicture(picture);
+    var formatSpec =  analyseDateTimePicture(picture);
 
     const offsetMillis = (60 * offsetHours + offsetMinutes) * 60 * 1000;
     var dateTime = new Date(millis + offsetMillis);
@@ -670,7 +830,7 @@ function parseDateTime(timestamp, picture) {
         return undefined;
     }
 
-    const formatSpec = analysePicture(picture);
+    const formatSpec = analyseDateTimePicture(picture);
     generateRegex(formatSpec);
     const fullRegex = '^' + formatSpec.map(function(part) {
         return '(' + part.regex + ')';
