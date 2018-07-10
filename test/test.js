@@ -2,6 +2,7 @@
 
 var formatInteger = require('../index').formatInteger;
 var formatDateTime = require('../index').formatDateTime;
+var parseInteger = require('../index').parseInteger;
 var parseDateTime = require('../index').parseDateTime;
 var assert = require('assert');
 var chai = require("chai");
@@ -388,6 +389,389 @@ describe('#formatInteger', function () {
         });
 
     })
+});
+
+describe('#parseInteger', function() {
+    describe('undefined value', function () {
+        it('should return result object', function () {
+            var result = parseInteger(undefined);
+            var expected = undefined;
+            assert.equal(result, expected);
+        });
+    });
+
+    describe('decimal-digit-pattern - cardinal', function () {
+        it('should parse a number', function () {
+            var result = parseInteger('123', '000');
+            var expected = 123;
+            assert.equal(result, expected);
+        });
+
+        it('should parse number padded with zeros', function () {
+            var result = parseInteger('0123', '0000');
+            var expected = 123;
+            assert.equal(result, expected);
+        });
+
+        it('should parse number', function () {
+            var result = parseInteger('1234', '0');
+            var expected = 1234;
+            assert.equal(result, expected);
+        });
+
+        it('should parse number with optional digits', function () {
+            var result = parseInteger('1234', '###0');
+            var expected = 1234;
+            assert.equal(result, expected);
+        });
+
+        it('should parse number with optional digits', function () {
+            var result = parseInteger('12', '###0');
+            var expected = 12;
+            assert.equal(result, expected);
+        });
+
+    });
+
+    describe('decimal-digit-pattern - ordinal', function () {
+        it('should parse a number', function () {
+            var result = parseInteger('123rd', '000;o');
+            var expected = 123;
+            assert.equal(result, expected);
+        });
+
+        it('should pad number with zeros', function () {
+            var result = parseInteger('1st', '0;o');
+            var expected = 1;
+            assert.equal(result, expected);
+        });
+
+        it('should pad number with zeros', function () {
+            var result = parseInteger('28th', '#0;o');
+            var expected = 28;
+            assert.equal(result, expected);
+        });
+
+        it('should pad number with zeros', function () {
+            var result = parseInteger('1234th', '###0;o');
+            var expected = 1234;
+            assert.equal(result, expected);
+        });
+
+        it('should pad number with zeros', function () {
+            var result = parseInteger('12th', '###0;o');
+            var expected = 12;
+            assert.equal(result, expected);
+        });
+
+    });
+
+    describe('decimal-digit-pattern - unicode decimal groups', function() {
+        it('should insert regular groups', function() {
+            var result = parseInteger('\u0661\u0662\u0663\u0664\u0660', '###\u0661');
+            var expected = 12340; // ١٢٣٤٠
+            assert.equal(result, expected);
+        });
+
+        it('should insert regular groups', function() {
+            var result = parseInteger('\uff11\uff12\uff13\uff14\uff10', '###\uff10');
+            var expected = 12340; // １２３４０
+            assert.equal(result, expected);
+        });
+
+    });
+
+    describe('decimal-digit-pattern - grouping separator', function() {
+        it('should insert regular groups', function() {
+            var result = parseInteger('12', '#,##0');
+            var expected = 12;
+            assert.equal(result, expected);
+        });
+
+        it('should insert regular groups', function() {
+            var result = parseInteger('1,200', '#,##0');
+            var expected = 1200;
+            assert.equal(result, expected);
+        });
+
+        it('should insert regular groups', function() {
+            var result = parseInteger('12,345,678', '#,##0');
+            var expected = 12345678;
+            assert.equal(result, expected);
+        });
+
+        it('should insert regular groups', function() {
+            var result = parseInteger('1,234,567,890', '#,##0');
+            var expected = 1234567890;
+            assert.equal(result, expected);
+        });
+
+        it('should insert regular groups', function() {
+            var result = parseInteger('1,234,567,890', '#,###,##0');
+            var expected = 1234567890;
+            assert.equal(result, expected);
+        });
+
+        it('should insert non-regular groups - different chars', function() {
+            var result = parseInteger('1234:567,890', '#:###,##0');
+            var expected = 1234567890;
+            assert.equal(result, expected);
+        });
+
+        it('should insert non-regular groups - different positions', function() {
+            var result = parseInteger('12345,67,890', '##,##,##0');
+            var expected = 1234567890;
+            assert.equal(result, expected);
+        });
+
+    });
+
+    describe('roman numerals', function () {
+        it('0', function () {
+            var result = parseInteger('', 'I');
+            var expected = 0;
+            assert.equal(result, expected);
+        });
+
+        it('1984', function () {
+            var result = parseInteger('MCMLXXXIV', 'I');
+            var expected = 1984;
+            assert.equal(result, expected);
+        });
+
+        it('99', function () {
+            var result = parseInteger('xcix', 'i');
+            var expected = 99;
+            assert.equal(result, expected);
+        });
+
+    });
+
+    describe('words - cardinal', function () {
+        it('12', function () {
+            var result = parseInteger('twelve', 'w');
+            var expected = 12;
+            assert.equal(result, expected);
+        });
+
+        it('20', function () {
+            var result = parseInteger('twenty', 'w');
+            var expected = 20;
+            assert.equal(result, expected);
+        });
+
+        it('34', function () {
+            var result = parseInteger('thirty-four', 'w');
+            var expected = 34;
+            assert.equal(result, expected);
+        });
+
+        it('99', function () {
+            var result = parseInteger('NINETY-NINE', 'W');
+            var expected = 99;
+            assert.equal(result, expected);
+        });
+
+        it('100', function () {
+            var result = parseInteger('one hundred', 'w');
+            var expected = 100;
+            assert.equal(result, expected);
+        });
+
+        it('555', function () {
+            var result = parseInteger('FIVE HUNDRED AND FIFTY-FIVE', 'W');
+            var expected = 555;
+            assert.equal(result, expected);
+        });
+
+        it('919', function () {
+            var result = parseInteger('nine hundred and nineteen', 'w');
+            var expected = 919;
+            assert.equal(result, expected);
+        });
+
+        it('730', function () {
+            var result = parseInteger('seven hundred and thirty', 'w');
+            var expected = 730;
+            assert.equal(result, expected);
+        });
+
+        it('1000', function () {
+            var result = parseInteger('one thousand', 'w');
+            var expected = 1000;
+            assert.equal(result, expected);
+        });
+
+        it('3730', function () {
+            var result = parseInteger('three thousand, seven hundred and thirty', 'w');
+            var expected = 3730;
+            assert.equal(result, expected);
+        });
+
+        it('327730', function () {
+            var result = parseInteger('three hundred and twenty-seven thousand, seven hundred and thirty', 'w');
+            var expected = 327730;
+            assert.equal(result, expected);
+        });
+
+        it('4327730', function () {
+            var result = parseInteger('four million, three hundred and twenty-seven thousand, seven hundred and thirty', 'w');
+            var expected = 4327730;
+            assert.equal(result, expected);
+        });
+
+        it('1e12 + 1', function () {
+            var result = parseInteger('one trillion and one', 'w');
+            var expected = 1e12 + 1;
+            assert.equal(result, expected);
+        });
+
+        it('1234567890123', function () {
+            var result = parseInteger('one trillion, two hundred and thirty-four billion, five hundred and sixty-seven million, eight hundred and ninety thousand, one hundred and twenty-three', 'w');
+            var expected = 1234567890123;
+            assert.equal(result, expected);
+        });
+
+        it('1e15', function () {
+            var result = parseInteger('one thousand trillion', 'w');
+            var expected = 1e15;
+            assert.equal(result, expected);
+        });
+
+        it('1e46', function () {
+            var result = parseInteger('ten billion trillion trillion trillion', 'w');
+            var expected = 1e46;
+            assert.equal(result, expected);
+        });
+
+        xit('1234567890123456', function () { // TODO think about this one
+            var result = parseInteger('one thousand, two hundred and thirty-four trillion, five hundred and sixty-seven billion, eight hundred and ninety million, one hundred and twenty-three thousand, four hundred and fifty-six', 'w');
+            var expected = 1234567890123456;
+            assert.equal(result, expected);
+        });
+
+    });
+
+    describe('words - ordinal', function () {
+        it('12', function () {
+            var result = parseInteger('twelfth', 'w;o');
+            var expected = 12;
+            assert.equal(result, expected);
+        });
+
+        it('20', function () {
+            var result = parseInteger('twentieth', 'w;o');
+            var expected = 20;
+            assert.equal(result, expected);
+        });
+
+        it('34', function () {
+            var result = parseInteger('thirty-fourth', 'w;o');
+            var expected = 34;
+            assert.equal(result, expected);
+        });
+
+        it('99', function () {
+            var result = parseInteger('NINETY-NINTH', 'W;o');
+            var expected = 99;
+            assert.equal(result, expected);
+        });
+
+        it('100', function () {
+            var result = parseInteger('one hundredth', 'w;o');
+            var expected = 100;
+            assert.equal(result, expected);
+        });
+
+        it('555', function () {
+            var result = parseInteger('FIVE HUNDRED AND FIFTY-FIFTH', 'W;o');
+            var expected = 555;
+            assert.equal(result, expected);
+        });
+
+        it('919', function () {
+            var result = parseInteger('nine hundred and nineteenth', 'w;o');
+            var expected = 919;
+            assert.equal(result, expected);
+        });
+
+        it('730', function () {
+            var result = parseInteger('seven hundred and thirtieth', 'w;o');
+            var expected = 730;
+            assert.equal(result, expected);
+        });
+
+        it('1000', function () {
+            var result = parseInteger('one thousandth', 'w;o');
+            var expected = 1000;
+            assert.equal(result, expected);
+        });
+
+        it('3730', function () {
+            var result = parseInteger('three thousand, seven hundred and thirty-first', 'w;o');
+            var expected = 3731;
+            assert.equal(result, expected);
+        });
+
+        it('327730', function () {
+            var result = parseInteger('three hundred and twenty-seven thousand, seven hundred and thirteenth', 'w;o');
+            var expected = 327713;
+            assert.equal(result, expected);
+        });
+
+        it('4327730', function () {
+            var result = parseInteger('four million, three hundred and twenty-seven thousand, seven hundred and thirty-second', 'w;o');
+            var expected = 4327732;
+            assert.equal(result, expected);
+        });
+
+        it('1e12 + 1', function () {
+            var result = parseInteger('one trillion and first', 'w;o');
+            var expected = 1e12 + 1;
+            assert.equal(result, expected);
+        });
+
+    });
+
+    describe('spreadsheet column names', function () {
+        it('1', function () {
+            var result = parseInteger('A', 'A');
+            var expected = 1;
+            assert.equal(result, expected);
+        });
+
+        it('12', function () {
+            var result = parseInteger('l', 'a');
+            var expected = 12;
+            assert.equal(result, expected);
+        });
+
+        it('26', function () {
+            var result = parseInteger('z', 'a');
+            var expected = 26;
+            assert.equal(result, expected);
+        });
+
+        it('27', function () {
+            var result = parseInteger('aa', 'a');
+            var expected = 27;
+            assert.equal(result, expected);
+        });
+
+        it('300', function () {
+            var result = parseInteger('KN', 'A');
+            var expected = 300;
+            assert.equal(result, expected);
+        });
+
+        it('123456', function () {
+            var result = parseInteger('FZPH', 'A');
+            var expected = 123456;
+            assert.equal(result, expected);
+        });
+
+    })
+
 });
 
 describe('#formatDateTime', function () {

@@ -61,8 +61,11 @@ decades.forEach(function (word, index) {
     wordValues[word] = (index + 2) * 10;
     wordValues[word.substring(0, word.length - 1) + 'ieth'] = wordValues[word];
 });
+wordValues.hundredth = 100;
 magnitudes.forEach(function (word, index) {
-    wordValues[word] = Math.pow(10, (index + 1) * 3);
+    const val = Math.pow(10, (index + 1) * 3);
+    wordValues[word] = val;
+    wordValues[word + 'th'] = val;
 });
 
 function wordsToNumber(text) {
@@ -70,30 +73,20 @@ function wordsToNumber(text) {
     const values = parts.map(function(part) {
         return wordValues[part];
     });
-    const partition = function(sequence) {
-        const group = [];
-        var pos = 0;
-        while(pos < sequence.length) {
-            group.push(sequence[pos]);
-            if(sequence[pos] >= 100) {
-                group.push(partition(sequence.slice(pos + 1)));
-                return group;
+    let segs = [0];
+    values.forEach(value => {
+        if(value < 100) {
+            let top = segs.pop();
+            if(top >= 1000) {
+                segs.push(top);
+                top = 0;
             }
-            pos++;
-        }
-        return group;
-    };
-    const sumTriplets = function(triple) {
-        if(triple.length === 3) {
-            return triple[0] * triple[1] + sumTriplets(triple[2]);
+            segs.push(top + value);
         } else {
-            return triple.reduce(function(acc, val) {
-                return acc + val;
-            });
+            segs.push(segs.pop() * value);
         }
-    };
-    const triplets = partition(values);
-    const result = sumTriplets(triplets);
+    });
+    const result = segs.reduce((a,b) => a + b, 0);
     return result;
 }
 
@@ -252,6 +245,7 @@ const decimalGroups = [0x30, 0x0660, 0x06F0, 0x07C0, 0x0966, 0x09E6, 0x0A66, 0x0
 
 function analyseIntegerPicture(picture) {
     const format = {
+        type: 'integer',
         primary: formats.DECIMAL,
         case: tcase.LOWER,
         ordinal: false
@@ -397,6 +391,10 @@ const defaultPresentationModifiers = {
 // §9.8.4.1 the format specifier is an array of string literals and variable markers
 function analyseDateTimePicture(picture) {
     var spec = [];
+    const format = {
+        type: 'datetime',
+        parts: spec
+    };
     var start = 0, pos = 0;
     while(pos < picture.length) {
         if(picture.charAt(pos) === '[') { //TODO check it's not a doubled [[
@@ -514,7 +512,7 @@ function analyseDateTimePicture(picture) {
         // last bit of literal text
         spec.push({ type: 'literal', value: picture.substring(start, pos) });
     }
-    return spec;
+    return format;
 }
 
 const days = ['', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -748,13 +746,13 @@ function formatDateTime(millis, picture, timezone) {
         return componentValue;
     };
 
-    var formatSpec =  analyseDateTimePicture(picture);
+    var formatSpec = analyseDateTimePicture(picture);
 
     const offsetMillis = (60 * offsetHours + offsetMinutes) * 60 * 1000;
     var dateTime = new Date(millis + offsetMillis);
 
     var result = '';
-    formatSpec.forEach(function(part) {
+    formatSpec.parts.forEach(function(part) {
         if(part.type === 'literal') {
             result += part.value;
         } else {
@@ -767,62 +765,105 @@ function formatDateTime(millis, picture, timezone) {
 
 
 function generateRegex(formatSpec) {
-    formatSpec.forEach(function(part) {
-        if(part.type === 'literal') {
-            part.regex = part.value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        } else {
-            if(part.integerPattern) {
-                switch(part.integerPattern[0]) {
-                    case 'a':
-                        part.regex = '[a-z]+';
-                        part.parse = function(value) { return lettersToDecimal(value, 'a'); };
-                        break;
-                    case 'A':
-                        part.regex = '[A-Z]+';
-                        part.parse = function(value) { return lettersToDecimal(value, 'A'); };
-                        break;
-                    case 'i':
-                        part.regex = '[mdclxvi]+';
-                        part.parse = function(value) { return romanToDecimal(value.toUpperCase()); };
-                        break;
-                    case 'I':
-                        part.regex = '[MDCLXVI]+';
-                        part.parse = function(value) { return romanToDecimal(value); };
-                        break;
-                    case 'w':
-                    case 'W':
-                        part.regex = '(?:' + Object.keys(wordValues).concat('and', '[\\-, ]').join('|') + ')+';
-                        part.parse = function(value) { return wordsToNumber(value.toLowerCase()); };
-                        break;
-                    default:
-                        // decimal-digit-pattern
-                        part.regex = '[0-9]+';
-                        if(part.ordinal) {
-                            // ordinals
-                            part.regex += '(?:th|st|nd|rd)'
-                        }
-                        part.parse = function(value) { return part.ordinal ? value.substring(0, value.length - 2) : value; };
-                }
+    var matcher = {};
+    if(formatSpec.type === 'datetime') {
+        matcher.type = 'datetime';
+        matcher.parts = formatSpec.parts.map(function (part) {
+            var res = {};
+            if (part.type === 'literal') {
+                res.regex = part.value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            } else if (part.integerFormat) {
+                res = generateRegex(part.integerFormat);
             } else {
                 // must be a month or day name
-                part.regex = '[a-zA-Z]+';
+                res.regex = '[a-zA-Z]+';
                 var lookup = {};
-                if(part.component === 'M' || part.component === 'x') {
+                if (part.component === 'M' || part.component === 'x') {
                     // months
-                    months.forEach(function(name, index) {
-                        if(part.width && part.width.max) {
+                    months.forEach(function (name, index) {
+                        if (part.width && part.width.max) {
                             lookup[name.substring(0, part.width.max)] = index + 1;
                         } else {
                             lookup[name] = index + 1;
                         }
                     });
-                } else if(part.component === 'P') {
+                } else if (part.component === 'P') {
                     lookup = {'am': 0, 'AM': 0, 'pm': 1, 'PM': 1};
                 }
-                part.parse = function(value) { return lookup[value] };
+                res.parse = function (value) {
+                    return lookup[value]
+                };
             }
+            res.component = part.component;
+            return res;
+        });
+    } else { // type === 'integer'
+        matcher.type = 'integer';
+        const isUpper = formatSpec.case === tcase.UPPER;
+        switch (formatSpec.primary) {
+            case formats.LETTERS:
+                matcher.regex = isUpper ? '[A-Z]+' : '[a-z]+';
+                matcher.parse = function (value) {
+                    return lettersToDecimal(value, isUpper ? 'A' : 'a');
+                };
+                break;
+            case formats.ROMAN:
+                matcher.regex = isUpper ? '[MDCLXVI]+' : '[mdclxvi]+';
+                matcher.parse = function (value) {
+                    return romanToDecimal(isUpper ? value : value.toUpperCase());
+                };
+                break;
+            case formats.WORDS:
+                matcher.regex = '(?:' + Object.keys(wordValues).concat('and', '[\\-, ]').join('|') + ')+';
+                matcher.parse = function (value) {
+                    return wordsToNumber(value.toLowerCase());
+                };
+                break;
+            case formats.DECIMAL:
+                matcher.regex = '[0-9]+';
+                if(formatSpec.ordinal) {
+                    // ordinals
+                    matcher.regex += '(?:th|st|nd|rd)'
+                }
+                matcher.parse = function (value) {
+                    let digits = value;
+                    if(formatSpec.ordinal) {
+                        // strip off the suffix
+                        digits = value.substring(0, value.length - 2);
+                    }
+                    if(formatSpec.groupingSeparators) {
+                        // strip out the separators
+                        if(formatSpec.regular) {
+                            digits = digits.split(',').join('');
+                        } else {
+                            formatSpec.groupingSeparators.forEach(sep => {
+                                digits = digits.split(sep.character).join('');
+                            })
+                        }
+                    }
+                    if(formatSpec.zeroCode !== 0x30) {
+                        // apply offset
+                        digits = digits.split('').map(char => String.fromCodePoint(char.codePointAt(0) - formatSpec.zeroCode + 0x30)).join('');
+                    }
+                    return parseInt(digits);
+                };
         }
-    });
+
+    }
+    return matcher;
+}
+
+function parseInteger(value, picture) {
+    if(typeof value === 'undefined') {
+        return undefined;
+    }
+
+    const formatSpec = analyseIntegerPicture(picture);
+    const matchSpec = generateRegex(formatSpec);
+    const fullRegex = '^' + matchSpec.regex + '$';
+    const matcher = new RegExp(fullRegex);
+    const result = matchSpec.parse(value);
+    return result;
 }
 
 function parseDateTime(timestamp, picture) {
@@ -831,8 +872,8 @@ function parseDateTime(timestamp, picture) {
     }
 
     const formatSpec = analyseDateTimePicture(picture);
-    generateRegex(formatSpec);
-    const fullRegex = '^' + formatSpec.map(function(part) {
+    const matchSpec = generateRegex(formatSpec);
+    const fullRegex = '^' + matchSpec.parts.map(function(part) {
         return '(' + part.regex + ')';
     }).join('') + '$';
 
@@ -841,9 +882,9 @@ function parseDateTime(timestamp, picture) {
     if(info !== null) {
         var components = {D: 1, m: 0, s: 0, f: 0};
         for(var i = 1; i < info.length; i++) {
-            const part = formatSpec[i-1];
-            if(part.type === 'marker') {
-                components[part.component] = parseInt(part.parse(info[i]));
+            const mpart = matchSpec.parts[i-1];
+            if(mpart.parse) {
+                components[mpart.component] = mpart.parse(info[i]);
             }
         }
 
@@ -887,5 +928,6 @@ function parseDateTime(timestamp, picture) {
 module.exports = {
     formatInteger: formatInteger,
     formatDateTime: formatDateTime,
+    parseInteger: parseInteger,
     parseDateTime: parseDateTime
 };
