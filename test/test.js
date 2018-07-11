@@ -32,7 +32,13 @@ describe('#formatInteger', function () {
         });
 
         it('should pad number with zeros', function () {
-            var result = formatInteger(1234, '0');
+            var result = formatInteger(-3, '0000');
+            var expected = '-0003';
+            assert.equal(result, expected);
+        });
+
+        it('should pad number with zeros', function () {
+            var result = formatInteger(1234, '0;c');
             var expected = '1234';
             assert.equal(result, expected);
         });
@@ -109,6 +115,12 @@ describe('#formatInteger', function () {
         it('should insert regular groups', function() {
             var result = formatInteger(1200, '#,##0');
             var expected = '1,200';
+            assert.equal(result, expected);
+        });
+
+        it('should insert regular groups', function() {
+            var result = formatInteger(120000, '#,##0');
+            var expected = '120,000';
             assert.equal(result, expected);
         });
 
@@ -802,6 +814,30 @@ describe('#formatDateTime', function () {
             assert.equal(result, expected);
         });
 
+        it('should format the year with grouping separator', function () {
+            var result = formatDateTime(1521801216617, 'Year: <[Y9,999,*]>');
+            var expected = 'Year: <2,018>';
+            assert.equal(result, expected);
+        });
+
+        it('should handle opening square bracket literal', function () {
+            var result = formatDateTime(1521801216617, '[[Year: <[Y0001]>');
+            var expected = '[Year: <2018>';
+            assert.equal(result, expected);
+        });
+
+        it('should handle closing square bracket literal', function () {
+            var result = formatDateTime(1521801216617, 'Year]]: <[Y0001]>');
+            var expected = 'Year]: <2018>';
+            assert.equal(result, expected);
+        });
+
+        it('should handle opening and closing square bracket literal', function () {
+            var result = formatDateTime(1521801216617, '[[Year]]: [[[Y0001]]]');
+            var expected = '[Year]: [2018]';
+            assert.equal(result, expected);
+        });
+
         it('should format the date in European style', function () {
             var result = formatDateTime(1521801216617, '[D#1]/[M#1]/[Y0001]');
             var expected = '23/3/2018';
@@ -838,23 +874,77 @@ describe('#formatDateTime', function () {
             assert.equal(result, expected);
         });
 
+        it('should ignore whitespace in variable markers', function () {
+            var result = formatDateTime(1521801216617, '[Y]-[ M01]-[D 01]T[H01 ]:[ m   ]:[s].[f0  01][Z01:\n 01t]');
+            var expected = '2018-03-23T10:33:36.617Z';
+            assert.equal(result, expected);
+        });
+
     });
 
     describe('timezone', function () {
         it('should offset for BST +0100', function () {
-            var result = formatDateTime(1521801216617, '[Y]-[M01]-[D01]T[H01]:[m]:[s].[f001][Z01:01t]', '+0100');
+            var result = formatDateTime(1521801216617, '[Y]-[M01]-[D01]T[H01]:[m]:[s].[f001][Z0101t]', '+0100');
             var expected = '2018-03-23T11:33:36.617+0100';
             assert.equal(result, expected);
         });
 
+        it('should offset for UTC', function () {
+            var result = formatDateTime(1531306800000, '[Y]-[M01]-[D01]T[H01]:[m]:[s][Z01:01]');
+            var expected = '2018-07-11T12:00:00+00:00';
+            assert.equal(result, expected);
+        });
+
+        it('should offset for Z', function () {
+            var result = formatDateTime(1531306800000, '[Y]-[M01]-[D01]T[H01]:[m]:[s][Z01:01t]');
+            var expected = '2018-07-11T12:00:00Z';
+            assert.equal(result, expected);
+        });
+
+        it('should offset for UTC', function () {
+            var result = formatDateTime(1531306800000, '[Y]-[M01]-[D01]T[H01]:[m]:[s][Z]', '-0500');
+            var expected = '2018-07-11T07:00:00-05:00';
+            assert.equal(result, expected);
+        });
+
+        it('should offset for UTC', function () {
+            var result = formatDateTime(1531306800000, '[Y]-[M01]-[D01]T[H01]:[m]:[s][Z0]', '-0500');
+            var expected = '2018-07-11T07:00:00-5';
+            assert.equal(result, expected);
+        });
+
+        it('should offset for UTC', function () {
+            var result = formatDateTime(1531306800000, '[Y]-[M01]-[D01]T[H01]:[m]:[s][Z]', '+1000');
+            var expected = '2018-07-11T22:00:00+10:00';
+            assert.equal(result, expected);
+        });
+
+        it('should offset for UTC', function () {
+            var result = formatDateTime(1531306800000, '[Y]-[M01]-[D01]T[H01]:[m]:[s][Z0]', '+1000');
+            var expected = '2018-07-11T22:00:00+10';
+            assert.equal(result, expected);
+        });
+
+        it('should offset for UTC', function () {
+            var result = formatDateTime(1531306800000, '[Y]-[M01]-[D01]T[H01]:[m]:[s][Z0]', '+0530');
+            var expected = '2018-07-11T17:30:00+5:30';
+            assert.equal(result, expected);
+        });
+
+        it('should offset for UTC', function () {
+            var result = formatDateTime(1531306800000, '[Y]-[M01]-[D01]T[H01]:[m]:[s][z]', '-0500');
+            var expected = '2018-07-11T07:00:00GMT-05:00';
+            assert.equal(result, expected);
+        });
+
         it('should rollover day boundaries', function () {
-            var result = formatDateTime(1204405500000, '[Y]-[M01]-[D01]T[H01]:[m]:[s].[f001][Z01:01t]', '+0530');
+            var result = formatDateTime(1204405500000, '[Y]-[M01]-[D01]T[H01]:[m]:[s].[f001][Z0101t]', '+0530');
             var expected = '2008-03-02T02:35:00.000+0530';
             assert.equal(result, expected);
         });
 
         it('should rollover year boundaries', function () {
-            var result = formatDateTime(1230757500000, '[Y]-[M01]-[D01]T[H01]:[m]:[s].[f001][Z01:01t]', '+0530');
+            var result = formatDateTime(1230757500000, '[Y]-[M01]-[D01]T[H01]:[m]:[s].[f001][Z0101t]', '+0530');
             var expected = '2009-01-01T02:35:00.000+0530';
             assert.equal(result, expected);
         });
@@ -864,6 +954,24 @@ describe('#formatDateTime', function () {
     describe('width modifier', function () {
         it('should return literal', function () {
             var result = formatDateTime(1521801216617, '[D#1,2]/[M1,2]/[Y,2]');
+            var expected = '23/03/18';
+            assert.equal(result, expected);
+        });
+
+        it('should return literal', function () {
+            var result = formatDateTime(1521801216617, '[D#1,2]/[M1,2]/[Y0001,2]');
+            var expected = '23/03/2018';
+            assert.equal(result, expected);
+        });
+
+        it('width modifier should override pattern', function () {
+            var result = formatDateTime(1521801216617, '[D#1,2]/[M1,2]/[Y##01,2-2]');
+            var expected = '23/03/18';
+            assert.equal(result, expected);
+        });
+
+        it('width modifier should override pattern', function () {
+            var result = formatDateTime(1521801216617, '[D#1,2]/[M1,2]/[Y0001,2-2]');
             var expected = '23/03/18';
             assert.equal(result, expected);
         });

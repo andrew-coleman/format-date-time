@@ -70,9 +70,7 @@ magnitudes.forEach(function (word, index) {
 
 function wordsToNumber(text) {
     const parts = text.split(/,\s|\sand\s|[\s\\-]/);
-    const values = parts.map(function(part) {
-        return wordValues[part];
-    });
+    const values = parts.map(part => wordValues[part]);
     let segs = [0];
     values.forEach(value => {
         if(value < 100) {
@@ -164,6 +162,8 @@ function formatInteger(value, picture) {
 
 function _formatInteger(value, format) {
     let formattedInteger;
+    const negative = value < 0;
+    value = Math.abs(value);
     switch(format.primary) {
         case formats.LETTERS:
             formattedInteger = decimalToLetters(value, format.case === tcase.UPPER ? 'A' : 'a');
@@ -195,7 +195,7 @@ function _formatInteger(value, format) {
             }
             // insert the grouping-separator-signs, if any
             if(format.regular) {
-                const n = Math.floor(formattedInteger.length / format.groupingSeparators.position);
+                const n = Math.floor((formattedInteger.length - 1) / format.groupingSeparators.position);
                 for(let ii = n; ii > 0; ii--) {
                     const pos = formattedInteger.length - ii * format.groupingSeparators.position;
                     formattedInteger = formattedInteger.substr(0, pos) + format.groupingSeparators.character + formattedInteger.substr(pos);
@@ -221,6 +221,9 @@ function _formatInteger(value, format) {
             throw {
                 code: 'unsupported: sequence'
             }
+    }
+    if(negative) {
+        formattedInteger = '-' + formattedInteger;
     }
 
     return formattedInteger;
@@ -286,6 +289,7 @@ function analyseIntegerPicture(picture) {
             // this is a decimal-digit-pattern if it contains a decimal digit (from any unicode decimal digit group)
             let zeroCode = null;
             let mandatoryDigits = 0;
+            let optionalDigits = 0;
             let groupingSeparators = [];
             let separatorPosition = 0;
             const formatCodepoints = Array.from(primaryFormat, c => c.codePointAt(0)).reverse(); // reverse the array to determine positions of grouping-separator-signs
@@ -313,6 +317,7 @@ function analyseIntegerPicture(picture) {
                 if(!digit) {
                     if (codePoint === 0x23) { // # - optional-digit-sign
                         separatorPosition++;
+                        optionalDigits++;
                     } else {
                         // neither a decimal-digit-sign ot optional-digit-sign, assume it is a grouping-separator-sign
                         groupingSeparators.push({
@@ -330,6 +335,8 @@ function analyseIntegerPicture(picture) {
                 format.zeroCode = zeroCode;
                 // the number of mandatory digits
                 format.mandatoryDigits = mandatoryDigits;
+                // the number of optional digits
+                format.optionalDigits = optionalDigits;
                 // grouping separator template
                 // are the grouping-separator-signs 'regular'?
                 const regularRepeat = function(separators) {
@@ -395,20 +402,38 @@ function analyseDateTimePicture(picture) {
         type: 'datetime',
         parts: spec
     };
+    const addLiteral = function(start, end) {
+        if(end > start) {
+            let literal = picture.substring(start, end);
+            // replace any doubled ]] with single ]
+            // what if there are instances of single ']' ? - the spec doesn't say
+            literal = literal.split(']]').join(']');
+            spec.push({ type: 'literal', value: literal });
+        }
+    };
+
     var start = 0, pos = 0;
     while(pos < picture.length) {
-        if(picture.charAt(pos) === '[') { //TODO check it's not a doubled [[
+        if(picture.charAt(pos) === '[') {
+            // check it's not a doubled [[
+            if(picture.charAt(pos + 1) === '[') {
+                // literal [
+                addLiteral(start, pos);
+                spec.push({ type: 'literal', value: '[' });
+                pos+=2;
+                start = pos;
+                continue;
+            }
             // start of variable marker
             // push the string literal (if there is one) onto the array
-            if(pos > start) {
-                spec.push({ type: 'literal', value: picture.substring(start, pos) });
-            }
+            addLiteral(start, pos);
             start = pos;
             // search forward to closing ]
             pos = picture.indexOf(']', start);
             // TODO handle error case if pos === -1
-            const marker = picture.substring(start+1, pos);
-            // TODO whitespace within a variable marker is ignored (i.e. remove it)
+            let marker = picture.substring(start+1, pos);
+            // whitespace within a variable marker is ignored (i.e. remove it)
+            marker = marker.split(/\s+/).join('');
             var def = {
                 type: 'marker',
                 component: marker.charAt(0)  // 1. The component specifier is always present and is always a single letter.
@@ -417,24 +442,27 @@ function analyseDateTimePicture(picture) {
             var presMod; // the presentation modifiers
             if(comma !== -1) {
                 // §9.8.4.2 The Width Modifier
-                var widthDef;
                 const widthMod = marker.substring(comma+1);
                 const dash = widthMod.indexOf('-');
-                widthDef = {};
+                let min, max;
+                const parseWidth = function(wm) {
+                    if(typeof wm === 'undefined' || wm === '*') {
+                        return undefined;
+                    } else {
+                        // TODO validate wm is an unsigned int
+                        return parseInt(wm);
+                    }
+                };
                 if(dash === -1) {
-                    if(widthMod !== '*') {
-                        widthDef.min = parseInt(widthMod)
-                    }
+                    min = widthMod;
                 } else {
-                    var min = widthMod.substring(0, dash);
-                    var max = widthMod.substring(dash + 1);
-                    if(min !== '*') {
-                        widthDef.min = parseInt(min);
-                    }
-                    if(max !== '*') {
-                        widthDef.max = parseInt(max);
-                    }
+                    min = widthMod.substring(0, dash);
+                    max = widthMod.substring(dash + 1);
                 }
+                const widthDef = {
+                    min: parseWidth(min),
+                    max: parseWidth(max)
+                };
                 def.width = widthDef;
                 presMod = marker.substring(1, comma);
             } else {
@@ -450,6 +478,8 @@ function analyseDateTimePicture(picture) {
                     if(lastChar === 'o') {
                         def.ordinal = true;
                     }
+                    // 'c' means 'cardinal' and is the default (i.e. not 'ordinal')
+                    // 'a' & 't' are ignored (not sure of their relevance to English numbering)
                     def.presentation1 = presMod.substring(0, presMod.length - 1);
                 } else {
                     def.presentation1 = presMod;
@@ -460,58 +490,40 @@ function analyseDateTimePicture(picture) {
                 // no presentation modifier specified - apply the default;
                 def.presentation1 = defaultPresentationModifiers[def.component];
             }
-            if(def.component === 'Y') {
-                // §9.8.4.4
-                def.n = -1;
-                if(def.width && def.width.min !== undefined) {
-                    def.n = def.width.min;
-                } else if(def.presentation1) {
-                    var w = def.presentation1;  // TODO only count the optional and mandatory digit signs
-                    if(w >= 2) {
-                        def.n = w;
-                    }
-                }
-            }
             if('YMDdFWwXxHhmsf'.indexOf(def.component) !== -1 && def.presentation1[0] !== 'N' && def.presentation1[0] !== 'n') {
                 var integerPattern = def.presentation1;
-                if (typeof integerPattern === 'undefined') {
-                    integerPattern = '0';
-                }
-                if (def.width && def.width.min !== undefined) {
-                    var specifiedWidth = 0;
-                    var patpos = integerPattern.length - 1;
-                    while (specifiedWidth < def.width.min) {
-                        if (patpos < 0) {
-                            integerPattern = '0' + integerPattern;
-                            specifiedWidth++;
-                            continue;
-                        }
-                        var currentChar = integerPattern.charAt(patpos);
-                        if ('0123456789'.indexOf(currentChar) !== -1) {
-                            specifiedWidth++;
-                            patpos--;
-                        } else if (currentChar === '#') {
-                            integerPattern = integerPattern.replaceAt(patpos, '0');
-                            specifiedWidth++;
-                            patpos--
-                        }
-                    }
-                }
                 if (def.presentation2) {
                     integerPattern += ';' + def.presentation2;
                 }
-                def.integerPattern = integerPattern;
                 def.integerFormat = analyseIntegerPicture(integerPattern);
+                if (def.width && def.width.min !== undefined) {
+                    if(def.integerFormat.mandatoryDigits < def.width.min) {
+                        def.integerFormat.mandatoryDigits = def.width.min;
+                    }
+                }
+                if (def.component === 'Y') {
+                    // §9.8.4.4
+                    def.n = -1;
+                    if(def.width && def.width.max !== undefined) {
+                        def.n = def.width.max;
+                        def.integerFormat.mandatoryDigits = def.n;
+                    } else {
+                        var w = def.integerFormat.mandatoryDigits + def.integerFormat.optionalDigits;
+                        if(w >= 2) {
+                            def.n = w;
+                        }
+                    }
+                }
+            }
+            if(def.component === 'Z' || def.component === 'z') {
+                def.integerFormat = analyseIntegerPicture(def.presentation1);
             }
             spec.push(def);
             start = pos + 1;
         }
         pos++;
     }
-    if(pos > start) {
-        // last bit of literal text
-        spec.push({ type: 'literal', value: picture.substring(start, pos) });
-    }
+    addLiteral(start, pos);
     return format;
 }
 
@@ -554,10 +566,6 @@ const yearMonth = function (year, month) {
 
 const deltaWeeks = function(start, end) {
     return (end - start) / (millisInADay * 7) + 1;
-};
-
-String.prototype.replaceAt = function(index, replacement) {
-    return this.substr(0, index) + replacement+ this.substr(index + replacement.length);
 };
 
 function formatDateTime(millis, picture, timezone) {
@@ -739,9 +747,33 @@ function formatDateTime(millis, picture, timezone) {
             // TODO §9.8.4.5 Formatting Fractional Seconds
             componentValue = _formatInteger(componentValue, markerSpec.integerFormat);
         } else if(markerSpec.component === 'Z' || markerSpec.component === 'z') {
-            // TODO §9.8.4.6 Formatting timezones
+            // §9.8.4.6 Formatting timezones
             console.log(offsetHours, offsetMinutes);
-            componentValue = timezone ? timezone : 'Z';
+            console.log(markerSpec);
+            const offset = offsetHours * 100 + offsetMinutes;
+            if(markerSpec.integerFormat.regular) {
+                componentValue = _formatInteger(offset, markerSpec.integerFormat)
+                console.log(offset, componentValue);
+            } else {
+                const numDigits = markerSpec.integerFormat.mandatoryDigits;
+                if(numDigits === 1 || numDigits === 2) {
+                    componentValue = _formatInteger(offsetHours, markerSpec.integerFormat);
+                    if(offsetMinutes !== 0) {
+                        componentValue += ':' + formatInteger(offsetMinutes, '00');
+                    }
+                } else if(numDigits === 3 || numDigits === 4) {
+                    componentValue = _formatInteger(offset, markerSpec.integerFormat);
+                }
+            }
+            if(offset >= 0) {
+                componentValue = '+' + componentValue;
+            }
+            if(markerSpec.component === 'z') {
+                componentValue = 'GMT' + componentValue;
+            }
+            if(offset === 0 && markerSpec.presentation2 === 't') {
+                componentValue = 'Z';
+            }
         }
         return componentValue;
     };
@@ -831,15 +863,13 @@ function generateRegex(formatSpec) {
                         // strip off the suffix
                         digits = value.substring(0, value.length - 2);
                     }
-                    if(formatSpec.groupingSeparators) {
-                        // strip out the separators
-                        if(formatSpec.regular) {
-                            digits = digits.split(',').join('');
-                        } else {
-                            formatSpec.groupingSeparators.forEach(sep => {
-                                digits = digits.split(sep.character).join('');
-                            })
-                        }
+                    // strip out the separators
+                    if(formatSpec.regular) {
+                        digits = digits.split(',').join('');
+                    } else {
+                        formatSpec.groupingSeparators.forEach(sep => {
+                            digits = digits.split(sep.character).join('');
+                        })
                     }
                     if(formatSpec.zeroCode !== 0x30) {
                         // apply offset
@@ -862,6 +892,7 @@ function parseInteger(value, picture) {
     const matchSpec = generateRegex(formatSpec);
     const fullRegex = '^' + matchSpec.regex + '$';
     const matcher = new RegExp(fullRegex);
+    // TODO validate input based on the matcher regex
     const result = matchSpec.parse(value);
     return result;
 }
@@ -873,9 +904,7 @@ function parseDateTime(timestamp, picture) {
 
     const formatSpec = analyseDateTimePicture(picture);
     const matchSpec = generateRegex(formatSpec);
-    const fullRegex = '^' + matchSpec.parts.map(function(part) {
-        return '(' + part.regex + ')';
-    }).join('') + '$';
+    const fullRegex = '^' + matchSpec.parts.map(part => '(' + part.regex + ')').join('') + '$';
 
     const matcher = new RegExp(fullRegex, 'i'); // TODO can cache this against the picture
     var info = matcher.exec(timestamp);
