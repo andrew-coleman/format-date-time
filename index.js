@@ -1,9 +1,9 @@
-const few = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten',
-    'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen'];
-const ordinals = ['zeroth', 'first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh', 'eighth', 'ninth', 'tenth',
-    'eleventh', 'twelfth', 'thirteenth', 'fourteenth', 'fifteenth', 'sixteenth', 'seventeenth', 'eighteenth', 'nineteenth'];
-const decades = ['twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety', 'hundred'];
-const magnitudes = ['thousand', 'million', 'billion', 'trillion'];
+const few = ['Zero', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten',
+    'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+const ordinals = ['Zeroth', 'First', 'Second', 'Third', 'Fourth', 'Fifth', 'Sixth', 'Seventh', 'Eighth', 'Ninth', 'Tenth',
+    'Eleventh', 'Twelfth', 'Thirteenth', 'Fourteenth', 'Fifteenth', 'Sixteenth', 'Seventeenth', 'Eighteenth', 'Nineteenth'];
+const decades = ['Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety', 'Hundred'];
+const magnitudes = ['Thousand', 'Million', 'Billion', 'Trillion'];
 
 function numberToWords(value, ordinal) {
     var lookup = function(num, prev, ord) {
@@ -22,7 +22,7 @@ function numberToWords(value, ordinal) {
         } else if (num < 1000) {
             const hundreds = Math.floor(num / 100);
             const remainder = num % 100;
-            words = (prev ? ', ' : '') + few[hundreds] + ' hundred';
+            words = (prev ? ', ' : '') + few[hundreds] + ' Hundred';
             if(remainder > 0) {
                 words += lookup(remainder, true, ord);
             } else if(ord) {
@@ -52,20 +52,22 @@ function numberToWords(value, ordinal) {
 
 const wordValues = {};
 few.forEach(function (word, index) {
-    wordValues[word] = index;
+    wordValues[word.toLowerCase()] = index;
 });
 ordinals.forEach(function (word, index) {
-    wordValues[word] = index;
+    wordValues[word.toLowerCase()] = index;
 });
 decades.forEach(function (word, index) {
-    wordValues[word] = (index + 2) * 10;
-    wordValues[word.substring(0, word.length - 1) + 'ieth'] = wordValues[word];
+    const lword = word.toLowerCase();
+    wordValues[lword] = (index + 2) * 10;
+    wordValues[lword.substring(0, word.length - 1) + 'ieth'] = wordValues[lword];
 });
 wordValues.hundredth = 100;
 magnitudes.forEach(function (word, index) {
+    const lword = word.toLowerCase();
     const val = Math.pow(10, (index + 1) * 3);
-    wordValues[word] = val;
-    wordValues[word + 'th'] = val;
+    wordValues[lword] = val;
+    wordValues[lword + 'th'] = val;
 });
 
 function wordsToNumber(text) {
@@ -178,6 +180,8 @@ function _formatInteger(value, format) {
             formattedInteger = numberToWords(value, format.ordinal);
             if(format.case === tcase.UPPER) {
                 formattedInteger = formattedInteger.toUpperCase();
+            } else if(format.case === tcase.LOWER) {
+                formattedInteger = formattedInteger.toLowerCase();
             }
             break;
         case formats.DECIMAL:
@@ -279,9 +283,12 @@ function analyseIntegerPicture(picture) {
             break;
         case 'W':
             format.case = tcase.UPPER;
-            if(picture[1] === 'w') {
-                format.case = tcase.TITLE;
-            }
+            format.primary = formats.WORDS;
+            break;
+        case 'Ww':
+            format.case = tcase.TITLE;
+            format.primary = formats.WORDS;
+            break;
         case 'w':
             format.primary = formats.WORDS;
             break;
@@ -490,7 +497,15 @@ function analyseDateTimePicture(picture) {
                 // no presentation modifier specified - apply the default;
                 def.presentation1 = defaultPresentationModifiers[def.component];
             }
-            if('YMDdFWwXxHhmsf'.indexOf(def.component) !== -1 && def.presentation1[0] !== 'N' && def.presentation1[0] !== 'n') {
+            if(def.presentation1[0] === 'n') {
+                def.names = tcase.LOWER;
+            } else if(def.presentation1[0] === 'N') {
+                if(def.presentation1[1] === 'n') {
+                    def.names = tcase.TITLE;
+                } else {
+                    def.names = tcase.UPPER;
+                }
+            } else if('YMDdFWwXxHhmsf'.indexOf(def.component) !== -1) {
                 var integerPattern = def.presentation1;
                 if (def.presentation2) {
                     integerPattern += ';' + def.presentation2;
@@ -726,15 +741,15 @@ function formatDateTime(millis, picture, timezone) {
                     componentValue = componentValue % Math.pow(10, markerSpec.n);
                 }
             }
-            if(markerSpec.presentation1 === 'Nn' || markerSpec.presentation1 === 'N' || markerSpec.presentation1 === 'n') {
+            if(markerSpec.names) {
                 if(markerSpec.component === 'M' || markerSpec.component === 'x') {
                     componentValue = months[componentValue - 1];
                 } else if(markerSpec.component === 'F') {
                     componentValue = days[componentValue];
                 }
-                if(markerSpec.presentation1 === 'N') {
+                if(markerSpec.names === tcase.UPPER) {
                     componentValue = componentValue.toUpperCase();
-                } else if(markerSpec.presentation1 === 'n') {
+                } else if(markerSpec.names === tcase.LOWER) {
                     componentValue = componentValue.toLowerCase();
                 }
                 if(markerSpec.width && componentValue.length > markerSpec.width.max) {

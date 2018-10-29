@@ -214,6 +214,12 @@ describe('#formatInteger', function () {
             assert.equal(result, expected);
         });
 
+        it('555', function () {
+            var result = formatInteger(555, 'Ww');
+            var expected = 'Five Hundred and Fifty-Five';
+            assert.equal(result, expected);
+        });
+
         it('919', function () {
             var result = formatInteger(919, 'w');
             var expected = 'nine hundred and nineteen';
@@ -596,6 +602,12 @@ describe('#parseInteger', function() {
             assert.equal(result, expected);
         });
 
+        it('555', function () {
+            var result = parseInteger('Five Hundred and Fifty-Five', 'Ww');
+            var expected = 555;
+            assert.equal(result, expected);
+        });
+
         it('919', function () {
             var result = parseInteger('nine hundred and nineteen', 'w');
             var expected = 919;
@@ -710,6 +722,12 @@ describe('#parseInteger', function() {
         it('730', function () {
             var result = parseInteger('seven hundred and thirtieth', 'w;o');
             var expected = 730;
+            assert.equal(result, expected);
+        });
+
+        it('733', function () {
+            var result = parseInteger('Seven Hundred and Thirty-Third', 'Ww;o');
+            var expected = 733;
             assert.equal(result, expected);
         });
 
